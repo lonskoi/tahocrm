@@ -18,7 +18,7 @@ services:
       retries: 30
 
   app:
-    image: ${APP_IMAGE:-ghcr.io/OWNER/REPO:latest}
+    image: ${APP_IMAGE:-ghcr.io/lonskoi/tahocrm:latest}
     container_name: tahocrm-app
     restart: unless-stopped
     depends_on:
@@ -31,6 +31,16 @@ services:
       PORT: 3000
     ports:
       - '80:3000'
+
+  migrator:
+    image: ${MIGRATOR_IMAGE:-ghcr.io/lonskoi/tahocrm:migrator}
+    container_name: tahocrm-migrator
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    profiles: ['migrate']
 
 volumes:
   tahocrm_pgdata:

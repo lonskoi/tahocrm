@@ -49,3 +49,13 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Build and push (migrator)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: migrator
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:migrator
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:migrator-${{ github.sha }}

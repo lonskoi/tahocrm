@@ -15,6 +15,13 @@ COPY . .
 RUN npm run db:generate
 RUN npm run build
 
+FROM base AS migrator
+ENV NODE_ENV=production
+COPY --from=deps /app/node_modules ./node_modules
+COPY prisma ./prisma
+COPY package.json package-lock.json ./
+CMD ["npx", "prisma", "db", "push"]
+
 FROM base AS runner
 ENV NODE_ENV=production
 ENV PORT=3000

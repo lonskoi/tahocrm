@@ -147,7 +147,7 @@ docker compose -f docker-compose.prod.yml ps
 
 ## 6) Инициализация БД и Prisma schema (на VPS)
 
-Эта команда будет выполняться **внутри контейнера app**.
+Инициализацию Prisma делаем через **migrator**-контейнер (это отдельный образ с Prisma CLI).
 
 1. Убедитесь, что Postgres поднялся:
 
@@ -158,13 +158,15 @@ docker compose -f docker-compose.prod.yml logs -n 200 db
 2. Прогон Prisma schema в master DB:
 
 ```bash
-docker compose -f docker-compose.prod.yml exec -e DATABASE_URL="$DATABASE_URL_MASTER" app npx prisma db push
+docker compose -f docker-compose.prod.yml run --rm --profile migrate \
+  -e DATABASE_URL="$DATABASE_URL_MASTER" migrator
 ```
 
 3. Прогон Prisma schema в tenant DB (tenant-1):
 
 ```bash
-docker compose -f docker-compose.prod.yml exec -e DATABASE_URL="postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@db:5432/tahocrm_tenant_tenant-1" app npx prisma db push
+docker compose -f docker-compose.prod.yml run --rm --profile migrate \
+  -e DATABASE_URL="postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@db:5432/tahocrm_tenant_tenant-1" migrator
 ```
 
 4. Создать TENANT_ADMIN:
