@@ -172,13 +172,13 @@ docker compose -f docker-compose.prod.yml run --rm --profile migrate \
 4. Создать TENANT_ADMIN:
 
 ```bash
-docker compose -f docker-compose.prod.yml exec \
+docker compose -f docker-compose.prod.yml run --rm --profile migrate \
   -e TENANT_ID="tenant-1" \
   -e TENANT_NAME="Мастерская tenant-1" \
   -e ADMIN_EMAIL="admin@tahoerp.ru" \
   -e ADMIN_PASSWORD="CHANGE_ME" \
   -e ADMIN_NAME="Администратор" \
-  app npm run create-tenant-admin
+  migrator npm run create-tenant-admin
 ```
 
 ## 7) Проверка

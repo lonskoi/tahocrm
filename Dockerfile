@@ -19,6 +19,10 @@ FROM base AS migrator
 ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
 COPY prisma ./prisma
+COPY scripts ./scripts
+COPY lib ./lib
+COPY types ./types
+COPY tsconfig.json ./tsconfig.json
 COPY package.json package-lock.json ./
 CMD ["npx", "prisma", "db", "push"]
 
