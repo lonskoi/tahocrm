@@ -1,36 +1,136 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# tahoCRM
 
-## Getting Started
+SaaS-платформа для автоматизации тахографических мастерских.
 
-First, run the development server:
+## Технологии
+
+- **Next.js 16** (App Router)
+- **TypeScript**
+- **Tailwind CSS**
+- **Prisma ORM** + PostgreSQL
+- **NextAuth.js** (аутентификация)
+- **Multi-tenancy** архитектура
+
+## Установка
+
+1. Установите зависимости:
+
+```bash
+npm install
+```
+
+2. Настройте переменные окружения:
+
+```bash
+# Windows (PowerShell)
+Copy-Item env.example .env
+
+# Linux/Mac
+cp env.example .env
+```
+
+Заполните `.env`:
+
+```
+DATABASE_URL="postgresql://user:password@localhost:5432/tahocrm"
+NEXTAUTH_SECRET="your-secret-key-here"
+NEXTAUTH_URL="http://localhost:3000"
+```
+
+3. Настройте базу данных:
+
+```bash
+npx prisma migrate dev
+npx prisma generate
+```
+
+4. Запустите проект:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Альтернатива (рекомендуется для Windows): verified запуск с Docker Postgres + Prisma + smoke-check:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run start:verified
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Примечание: `start:verified` по умолчанию **не чистит** кэш Next.js. Если нужно принудительно сбросить `.next` (например, после странных проблем с dev-кэшем), запустите:
 
-## Learn More
+```bash
+CLEAR_NEXT_CACHE=1 npm run start:verified
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Структура проекта
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+├── app/                    # Next.js App Router
+│   ├── api/               # API routes
+│   ├── dashboard/         # Рабочие столы
+│   └── login/             # Страница входа
+├── components/            # React компоненты
+│   ├── ui/               # Базовые UI компоненты
+│   └── layout/           # Layout компоненты
+├── lib/                   # Утилиты и конфигурация
+├── prisma/               # Схема базы данных
+└── types/                # TypeScript типы
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Роли пользователей
 
-## Deploy on Vercel
+- **SUPER_ADMIN** - Владелец платформы ("Папа")
+- **MANAGER** - Менеджер
+- **MASTER** - Мастер (Установщик/Настройщик)
+- **CARD_SPECIALIST** - Специалист по картам
+- **DIRECTOR** - Руководитель мастерской
+- **CLIENT** - Клиент (Перевозчик)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Основные функции
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### ✅ Реализовано
+
+- ✅ Базовая структура проекта (Next.js 16, TypeScript, Tailwind CSS)
+- ✅ Multi-tenancy архитектура с изоляцией данных по tenantId
+- ✅ Система аутентификации (NextAuth.js v5)
+- ✅ Ролевая модель (6 ролей: SUPER_ADMIN, MANAGER, MASTER, CARD_SPECIALIST, DIRECTOR, CLIENT)
+- ✅ Рабочие столы для всех ролей с навигацией
+- ✅ Универсальная кнопка "+" с парсингом комментариев
+- ✅ Глобальный поиск (Smart Search) по ИНН, госномеру, VIN, серийному номеру, фамилии
+- ✅ Система задач с двойным подтверждением (Исполнитель → Инициатор)
+- ✅ Полная схема базы данных (Prisma) со всеми моделями:
+  - Tenant, User, Vehicle, Tachograph, SKZI
+  - Order, OrderDocument, WorkflowStep
+  - Task, DriverCard, CalibrationHistory
+  - Invoice, BankStatement, WarehouseItem
+  - Trigger, AuditLog, Complaint
+- ✅ API endpoints для поиска и задач
+- ✅ Middleware для защиты маршрутов
+- ✅ Базовые UI компоненты (Button, Input, Modal)
+- ✅ Скрипт создания первого администратора
+
+### 🚧 В разработке
+
+- Workflow для замены СКЗИ (Wizard с пошаговой активацией)
+- Модуль финансов (автогенерация счетов/УПД, импорт банковских выписок)
+- Модуль склада (ленивый режим с опциональными серийными номерами)
+- Система триггеров и напоминаний (СКЗИ 35 мес, калибровка 24 мес, карты 3 года, батарейка 2 года)
+- Модуль рекламаций (отправка данных о браке СКЗИ)
+- Мобильная версия для мастеров (фотофиксация через камеру)
+- Расширенный личный кабинет клиента (выгрузка ddd-файлов)
+- OCR для автозаполнения документов
+- Печать сертификатов и наклеек (настраиваемые форматы)
+
+## Развертывание
+
+Проект готов к развертыванию на Beget VPS через Docker:
+
+```bash
+# Создайте Dockerfile и docker-compose.yml
+# Настройте переменные окружения
+# Запустите миграции базы данных
+```
+
+## Лицензия
+
+Приватный проект.

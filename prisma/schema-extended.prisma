@@ -1,0 +1,187 @@
+// Расширенная схема для детального workflow замены СКЗИ
+// Добавить в основной schema.prisma
+
+enum OrderPaymentType {
+  CASH           // Нал
+  CASHLESS       // Безнал
+}
+
+enum OrderTaxType {
+  WITH_VAT       // С НДС
+  WITHOUT_VAT    // Без НДС
+}
+
+enum SKZIWorkflowStep {
+  // Этап 1: Прием заказа
+  ORDER_CREATED              // Заказ создан
+  INVOICE_ISSUED             // Счет выставлен
+  PAYMENT_RECEIVED           // Оплата получена
+  APPOINTMENT_SCHEDULED      // Время визита согласовано
+  
+  // Этап 2: Подготовка
+  CLIENT_ARRIVED             // Клиент приехал
+  TACHOGRAPH_REMOVED         // Тахограф снят
+  MCHD_CHECKED                // МЧД проверена в личном кабинете
+  MCHD_PERSON_VERIFIED        // Проверено что человек из МЧД приехал
+  
+  // Этап 3: Проверка активаций
+  ACTIVATION_CHECK_REQUESTED  // Запрос на проверку активаций отправлен
+  ACTIVATION_CHECK_COMPLETED  // Проверка завершена (10 минут)
+  
+  // Этап 4: Проверка тахографа
+  TACHOGRAPH_CHECKED         // Тахограф проверен
+  FIRMWARE_UPDATED           // ПО обновлено (если нужно)
+  BATTERY_REPLACED           // Батарейка заменена (если нужно)
+  
+  // Этап 5: Замена блока
+  OLD_SKZI_REMOVED           // Старый блок снят
+  NEW_SKZI_INSTALLED         // Новый блок установлен
+  OLD_SKZI_HANDED_TO_CLIENT  // Старый блок отдан клиенту
+  
+  // Этап 6: Деактивация
+  OLD_ACTIVATIONS_DEACTIVATED // Старые активации деактивированы
+  
+  // Этап 7: Подготовка активации
+  PASSPORT_SCANNED           // Паспорт отсканирован (2 разворота)
+  PERSONAL_DATA_COLLECTED     // СНИЛС и ИНН собраны
+  ACTIVATION_REQUEST_CREATED  // Заявка создана на сайте подготовки
+  CONSENT_FORMED              // Согласие на обработку ПД сформировано
+  CONSENT_SIGNED              // Согласие подписано клиентом
+  CONSENT_SCANNED             // Согласие отсканировано
+  CONSENT_SIGNED_WITH_ECP     // Согласие подписано ЭЦП
+  REQUEST_SENT_FOR_REVIEW     // Заявка отправлена на проверку
+  
+  // Этап 8: Ожидание проверки (5 мин - 5 дней)
+  REQUEST_APPROVED            // Заявка одобрена
+  
+  // Этап 9: Заявление на изготовление подписи
+  SIGNATURE_STATEMENT_DOWNLOADED // Заявление скачано
+  SIGNATURE_STATEMENT_PRINTED    // Заявление распечатано
+  SIGNATURE_STATEMENT_SIGNED     // Заявление подписано клиентом
+  SIGNATURE_STATEMENT_PHOTO      // Фото с лицом и реквизитами сделано
+  SIGNATURE_STATEMENT_SCANNED     // Заявление отсканировано
+  SIGNATURE_STATEMENT_SIGNED_ECP  // Заявление подписано ЭЦП
+  SIGNATURE_STATEMENT_UPLOADED     // Заявление загружено
+  
+  // Этап 10: Активация через АРМ
+  ACTIVATION_REQUEST_RECEIVED    // Запрос пришел в АРМ активации (5 мин)
+  MASTER_CARD_INSERTED            // Карта мастерской вставлена в считыватель
+  ACTIVATION_STARTED              // Активация начата
+  CARD_INSERTED_IN_TACHOGRAPH     // Карта вставлена в тахограф
+  PIN_ENTERED                     // Пин-код введен
+  ACTIVATION_DATA_SENT            // Данные отправлены на обработку (5 мин)
+  
+  // Этап 11: Расписка
+  RECEIPT_DOWNLOADED              // Расписка скачана
+  RECEIPT_PRINTED                 // Расписка распечатана
+  RECEIPT_SIGNED                  // Расписка подписана клиентом
+  RECEIPT_PHOTO                   // Фото расписки сделано
+  RECEIPT_SCANNED                 // Расписка отсканирована
+  RECEIPT_SIGNED_ECP              // Расписка подписана ЭЦП
+  RECEIPT_UPLOADED                // Расписка загружена
+  
+  // Этап 12: Финальная активация
+  FINAL_ACTIVATION_READY          // Готово к финальной активации (1 мин)
+  FINAL_ACTIVATION_STARTED         // Финальная активация начата
+  TACHOGRAPH_DATA_ENTERED         // Данные введены в тахограф (Гос, VIN, коэффициенты)
+  
+  // Этап 13: Завершение
+  TECHNICAL_REPORT_PRINTED         // Отчет технических данных распечатан
+  CALIBRATION_CERTIFICATE_PRINTED  // Сертификат калибровки распечатан
+  CALIBRATION_STICKER_PRINTED      // Калибровочная наклейка распечатана
+  CLOSING_DOCUMENTS_PRINTED        // Закрывающие документы распечатаны
+  DOCUMENTS_SIGNED                 // Документы подписаны клиентом
+  TACHOGRAPH_INSTALLED            // Тахограф установлен обратно
+  STICKER_APPLIED                 // Наклейка наклеена
+  ERRORS_CHECKED                   // Проверка на ошибки выполнена
+  ORDER_COMPLETED                  // Заказ завершен
+}
+
+model Order {
+  // ... существующие поля ...
+  
+  // Дополнительные поля для workflow
+  paymentType      OrderPaymentType?
+  taxType          OrderTaxType?
+  appointmentDate  DateTime?        // Время визита клиента
+  currentStep      SKZIWorkflowStep?
+  
+  // Данные клиента для активации
+  clientOrganizationName String?    // Название организации
+  clientInn              String?     // ИНН организации
+  clientKpp              String?     // КПП организации
+  clientOgrn             String?     // ОГРН организации
+  
+  // Данные МЧД
+  mchdNumber             String?     // Номер МЧД
+  mchdPersonName         String?     // ФИО человека из МЧД
+  mchdPersonSnils         String?     // СНИЛС
+  mchdPersonInn           String?     // ИНН человека
+  
+  // Данные паспорта
+  passportSeries          String?     // Серия паспорта
+  passportNumber          String?     // Номер паспорта
+  passportIssuedBy        String?     // Кем выдан
+  passportIssueDate       DateTime?   // Дата выдачи
+  
+  // Данные активации
+  activationRequestNumber String?     // Номер заявки на активацию
+  activationRequestStatus String?     // Статус заявки (pending, approved, rejected)
+  activationRequestBarcode String?    // Штрихкод заявки
+  activationRequestQrCode  String?     // QR-код заявки
+  
+  // Данные о проверке активаций
+  activationCheckRequestedAt DateTime?  // Когда запрошена проверка
+  activationCheckCompletedAt  DateTime? // Когда проверка завершена
+  hasActiveActivations       Boolean?   // Есть ли действующие активации
+  
+  // Данные о тахографе
+  tachographFirmwareVersion String?    // Версия ПО тахографа
+  tachographFirmwareUpdated Boolean     @default(false)
+  batteryReplacedDuringWork Boolean    @default(false)
+  
+  // Данные о блоках СКЗИ
+  oldSkziSerialNumber      String?     // Серийный номер старого блока
+  newSkziSerialNumber      String?     // Серийный номер нового блока
+  oldSkziHandedToClient     Boolean     @default(false)
+  
+  // Временные метки этапов
+  orderCreatedAt           DateTime?   @default(now())
+  invoiceIssuedAt          DateTime?
+  paymentReceivedAt         DateTime?
+  appointmentScheduledAt   DateTime?
+  clientArrivedAt           DateTime?
+  orderCompletedAt          DateTime?
+}
+
+model WorkflowStep {
+  // ... существующие поля ...
+  
+  // Дополнительные поля
+  stepOrder        Int?        // Порядок шага
+  estimatedTime    Int?        // Оценочное время в минутах
+  actualTime       Int?        // Фактическое время в минутах
+  notes            String?      // Заметки по шагу
+  requiresWait     Boolean      @default(false) // Требует ожидания (например, 10 минут)
+  waitStartedAt    DateTime?    // Когда началось ожидание
+  waitCompletedAt  DateTime?   // Когда ожидание завершено
+}
+
+model OrderDocument {
+  // ... существующие поля ...
+  
+  // Расширенные типы документов
+  // "passport_page1", "passport_page2", "passport_registration"
+  // "consent_personal_data", "consent_signed", "consent_scanned", "consent_ecp"
+  // "signature_statement", "signature_statement_photo", "signature_statement_scanned", "signature_statement_ecp"
+  // "receipt_key", "receipt_photo", "receipt_scanned", "receipt_ecp"
+  // "technical_report", "calibration_certificate", "calibration_sticker", "closing_documents"
+  
+  documentNumber   String?      // Номер документа (для заявок)
+  barcode          String?      // Штрихкод документа
+  qrCode           String?      // QR-код документа
+  signedByClient   Boolean      @default(false)
+  signedWithECP    Boolean      @default(false)
+  ecpSignatureDate DateTime?
+}
+

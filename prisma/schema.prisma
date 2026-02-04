@@ -1,0 +1,991 @@
+// tahoCRM Database Schema
+// Multi-tenant architecture with subscriptions and payment control
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==================== CORE TENANT MODEL ====================
+enum SubscriptionStatus {
+  TRIAL // Пробный период
+  ACTIVE // Активная подписка
+  SUSPENDED // Приостановлена (не оплачено)
+  CANCELLED // Отменена
+  EXPIRED // Истекла
+  BLOCKED // Заблокирована администратором
+}
+
+enum SubscriptionPlan {
+  BASIC // Базовый план
+  PROFESSIONAL // Профессиональный
+  ENTERPRISE // Корпоративный
+}
+
+// ==================== CRM CORE ====================
+enum CustomerType {
+  COMPANY // Юрлицо
+  SOLE_PROPRIETOR // ИП
+  INDIVIDUAL // Физлицо
+}
+
+enum VehicleCategory {
+  N1
+  N2
+  N3
+  M1
+  M2
+  M3
+}
+
+enum VatRate {
+  NONE
+  VAT_5
+  VAT_7
+  VAT_10
+  VAT_20
+  VAT_22
+}
+
+enum DocumentType {
+  INVOICE
+  UPD
+  ACT
+  CALIBRATION_CERT
+  INSTALLATION_ACT
+  CONTRACT
+  OTHER
+}
+
+enum DocumentSequenceType {
+  ORDER
+  INVOICE
+  UPD
+}
+
+enum DriverCardRequestStatus {
+  DRAFT
+  IN_WORK
+  READY
+  ISSUED
+  CANCELLED
+}
+
+model Tenant {
+  id       String  @id @default(cuid())
+  name     String
+  inn      String? @unique
+  address  String?
+  phone    String?
+  email    String?
+  timezone String  @default("Europe/Moscow")
+
+  // Подписка
+  subscriptionStatus    SubscriptionStatus @default(TRIAL)
+  subscriptionPlan      SubscriptionPlan   @default(BASIC)
+  subscriptionStartDate DateTime?
+  subscriptionEndDate   DateTime?
+  trialEndDate          DateTime? // Конец пробного периода
+  isActive              Boolean            @default(true)
+  isBlocked             Boolean            @default(false)
+  blockedReason         String? // Причина блокировки
+  blockedAt             DateTime?
+  blockedBy             String? // ID администратора, который заблокировал
+
+  // Лимиты
+  maxUsers          Int @default(5)
+  maxVehicles       Int @default(50)
+  maxOrdersPerMonth Int @default(100)
+
+  // Статистика использования
+  currentUsersCount    Int      @default(0)
+  currentVehiclesCount Int      @default(0)
+  ordersThisMonth      Int      @default(0)
+  lastResetDate        DateTime @default(now())
+
+  // Настройки по умолчанию
+  defaultVatRate VatRate @default(VAT_22)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  users              User[]
+  vehicles           Vehicle[]
+  tachographs        Tachograph[]
+  skziBlocks         SKZI[]
+  orders             Order[]
+  tasks              Task[]
+  cards              DriverCard[]
+  driverCardRequests DriverCardRequest[]
+  calibrationHistory CalibrationHistory[]
+  invoices           Invoice[]
+  warehouse          WarehouseItem[]
+  triggers           Trigger[]
+  auditLogs          AuditLog[]
+  subscriptions      Subscription[]
+  payments           Payment[]
+
+  // CRM core
+  customers            Customer[]
+  contacts             Contact[]
+  customerBankAccounts CustomerBankAccount[]
+  issuerOrganizations  IssuerOrganization[]
+  products             Product[]
+  services             Service[]
+  documents            Document[]
+  documentNumberSequences DocumentNumberSequence[]
+  uiConfig             TenantUiConfig?
+  invoiceLineItems     InvoiceLineItem[]
+
+  @@index([inn])
+  @@index([subscriptionStatus])
+  @@index([isActive])
+  @@index([isBlocked])
+}
+
+model DocumentNumberSequence {
+  id        String               @id @default(cuid())
+  tenantId  String
+  docType   DocumentSequenceType
+  resetYear Int
+  nextNumber Int                @default(0)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, docType])
+  @@index([tenantId])
+}
+
+model TenantUiConfig {
+  id        String   @id @default(cuid())
+  tenantId  String   @unique
+  // Enabled modules + simple UI switches.
+  // Example: { customers: true, vehicles: true, equipment: true, orders: true, invoices: true, documents: true, settings: true }
+  modules   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model Customer {
+  id       String       @id @default(cuid())
+  tenantId String
+  type     CustomerType @default(COMPANY)
+  // Display name (company name or full name)
+  name     String
+  // Full legal name (optional)
+  fullName String?
+
+  // Company fields
+  inn  String?
+  kpp  String?
+  ogrn String?
+  okpo String?
+
+  // Individual fields
+  firstName  String?
+  lastName   String?
+  middleName String?
+  passport   String?
+
+  // Common
+  // Фактический адрес (legacy field name)
+  address        String?
+  // Комментарий к адресу
+  addressComment String?
+  // Юридический адрес
+  legalAddress   String?
+  phone          String?
+  email          String?
+  // Комментарий к клиенту
+  comment        String?
+  // Доступ: владелец (создатель)
+  createdById    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant       Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy    User?                 @relation("CustomerCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  contacts     Contact[]
+  bankAccounts CustomerBankAccount[]
+  responsibles CustomerResponsible[]
+  vehicles     Vehicle[]
+  equipment    Tachograph[]
+  orders       Order[]
+  invoices     Invoice[]
+  documents    Document[]
+  tasks        Task[]
+  driverCardRequests DriverCardRequest[]
+
+  @@index([tenantId])
+  @@index([type])
+  @@index([inn])
+  @@index([name])
+  @@index([createdById])
+}
+
+model Contact {
+  id         String   @id @default(cuid())
+  tenantId   String
+  customerId String
+  name       String
+  position   String?
+  phone      String?
+  email      String?
+  comment    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  orders   Order[]
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([name])
+}
+
+model CustomerBankAccount {
+  id            String   @id @default(cuid())
+  tenantId      String
+  customerId    String
+  bik           String?
+  bankName      String?
+  bankAddress   String?
+  corrAccount   String?
+  accountNumber String?
+  comment       String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([customerId])
+}
+
+model CustomerResponsible {
+  customerId String
+  userId     String
+  createdAt  DateTime @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([customerId, userId])
+  @@index([userId])
+}
+
+model IssuerOrganization {
+  id       String  @id @default(cuid())
+  tenantId String
+  name     String
+  inn      String?
+  kpp      String?
+  ogrn     String?
+  address  String?
+  phone    String?
+  email    String?
+
+  bankName    String?
+  bankBic     String?
+  bankAccount String? // р/с
+  bankCorr    String? // к/с
+
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoices Invoice[]
+
+  @@index([tenantId])
+  @@index([isDefault])
+}
+
+model Product {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  sku       String?
+  unit      String? // "шт", "усл", etc.
+  price     Decimal  @default(0)
+  vatRate   VatRate  @default(VAT_20)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoiceItems InvoiceLineItem[]
+
+  @@index([tenantId])
+  @@index([name])
+  @@index([sku])
+}
+
+model Service {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  sku       String?
+  unit      String?
+  price     Decimal  @default(0)
+  vatRate   VatRate  @default(VAT_20)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoiceItems InvoiceLineItem[]
+
+  @@index([tenantId])
+  @@index([name])
+  @@index([sku])
+}
+
+model Document {
+  id       String       @id @default(cuid())
+  tenantId String
+  type     DocumentType @default(OTHER)
+  title    String?
+  fileUrl  String
+  fileName String
+  mimeType String?
+
+  // Optional links
+  customerId   String?
+  orderId      String?
+  invoiceId    String?
+  vehicleId    String?
+  tachographId String?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer   Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  order      Order?      @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  invoice    Invoice?    @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  vehicle    Vehicle?    @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  tachograph Tachograph? @relation(fields: [tachographId], references: [id], onDelete: SetNull)
+  createdBy  User?       @relation("DocumentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([type])
+  @@index([customerId])
+  @@index([orderId])
+  @@index([invoiceId])
+  @@index([vehicleId])
+  @@index([tachographId])
+}
+
+// ==================== SUBSCRIPTION & PAYMENTS ====================
+model Subscription {
+  id              String             @id @default(cuid())
+  tenantId        String
+  plan            SubscriptionPlan
+  status          SubscriptionStatus
+  startDate       DateTime
+  endDate         DateTime
+  price           Decimal // Цена подписки
+  currency        String             @default("RUB")
+  autoRenew       Boolean            @default(true)
+  cancelledAt     DateTime?
+  cancelledReason String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  // Relations
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payments Payment[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([endDate])
+}
+
+model Payment {
+  id             String    @id @default(cuid())
+  tenantId       String
+  subscriptionId String?
+  amount         Decimal
+  currency       String    @default("RUB")
+  status         String    @default("pending") // "pending", "completed", "failed", "refunded"
+  paymentMethod  String? // "card", "bank_transfer", "other"
+  transactionId  String? // ID транзакции от платежной системы
+  description    String?
+  paidAt         DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([paidAt])
+}
+
+// ==================== AUTHENTICATION & USERS ====================
+enum UserRole {
+  SUPER_ADMIN // "Папа" - владелец платформы
+  TENANT_ADMIN // Администратор мастерской (внутри tenant-а)
+  MANAGER // Менеджер
+  MASTER // Мастер (Установщик/Настройщик)
+  CARD_SPECIALIST // Специалист по картам
+  DIRECTOR // Руководитель мастерской
+  CLIENT // Клиент (Перевозчик)
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  password  String
+  name      String
+  phone     String?
+  role      UserRole
+  tenantId  String? // null для SUPER_ADMIN
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  lastLogin DateTime?
+
+  // Relations
+  tenant                   Tenant?               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdTasks             Task[]                @relation("TaskCreator")
+  assignedTasks            Task[]                @relation("TaskAssignee")
+  orders                   Order[]
+  auditLogs                AuditLog[]
+  documentsCreated         Document[]            @relation("DocumentCreatedBy")
+  customersCreated         Customer[]            @relation("CustomerCreatedBy")
+  customerResponsibilities CustomerResponsible[]
+  driverCardRequestsCreated DriverCardRequest[]  @relation("DriverCardRequestCreatedBy")
+
+  @@index([tenantId])
+  @@index([email])
+  @@index([role])
+}
+
+// ==================== VEHICLES & EQUIPMENT ====================
+enum EquipmentType {
+  TACHOGRAPH
+  GLONASS
+  OTHER
+}
+
+model Vehicle {
+  id           String           @id @default(cuid())
+  tenantId     String
+  customerId   String?
+  govNumber    String // Госномер (А123ВВ)
+  vin          String? // VIN номер
+  color        String? // Цвет
+  brand        String? // Марка
+  model        String? // Модель
+  year         Int?
+  ptsNumber    String? // Номер ПТС
+  category     VehicleCategory? // Категория ТС (N1..M3)
+  ecoClass     String? // Экологический класс
+  ownerInn     String? // ИНН владельца
+  ownerName    String? // Название перевозчика
+  ownerAddress String? // Адрес собственника ТС
+  mileage      Int? // Актуальный пробег
+  tireSize     String? // Размерность резины
+  notes        String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  // Relations
+  tenant             Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer           Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  tachographs        Tachograph[]
+  orders             Order[]
+  tasks              Task[]
+  calibrationHistory CalibrationHistory[]
+  documents          Document[]
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([govNumber])
+  @@index([vin])
+  @@index([ownerInn])
+}
+
+model Tachograph {
+  id                String        @id @default(cuid())
+  tenantId          String
+  type              EquipmentType @default(TACHOGRAPH)
+  vehicleId         String? // Может быть не привязан к машине
+  customerId        String? // Прямая привязка к клиенту
+  brand             String? // Марка оборудования
+  model             String? // Модель оборудования
+  serialNumber      String? // Серийный номер
+  comment           String? // Комментарий
+  skziId            String? // ID блока СКЗИ
+  batteryReplaced   Boolean       @default(false)
+  batteryReplacedAt DateTime?
+  w                 String? // Коэффициент W
+  k                 String? // Коэффициент K
+  l                 String? // Коэффициент L
+  workDate          DateTime? // Дата выполнения работ (калибровки)
+  tireSize          String? // Размерность резины
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  // Relations
+  tenant             Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vehicle            Vehicle?             @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  customer           Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  skzi               SKZI?                @relation(fields: [skziId], references: [id], onDelete: SetNull)
+  calibrationHistory CalibrationHistory[]
+  orders             Order[]
+  documents          Document[]
+
+  @@index([tenantId])
+  @@index([serialNumber])
+  @@index([vehicleId])
+  @@index([customerId])
+  @@index([type])
+}
+
+model SKZI {
+  id             String    @id @default(cuid())
+  tenantId       String
+  serialNumber   String? // Серийный номер блока
+  activationDate DateTime? // Дата активации
+  expiryDate     DateTime? // Дата окончания (35 месяцев)
+  isActive       Boolean   @default(true)
+  mchd           String? // МЧД
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tachographs Tachograph[]
+
+  @@index([tenantId])
+  @@index([serialNumber])
+}
+
+// ==================== ORDERS & WORKFLOW ====================
+enum OrderStatus {
+  DRAFT
+  IN_PROGRESS
+  WAITING_PARTS
+  WAITING_ACTIVATION
+  COMPLETED
+  CANCELLED
+}
+
+enum OrderType {
+  SKZI_REPLACEMENT // Замена СКЗИ
+  CALIBRATION // Калибровка
+  BATTERY_REPLACEMENT // Замена батарейки
+  CARD_ISSUE // Выдача карты
+  CUSTOMER_ORDER // Заказ покупателя
+  OTHER // Прочее
+}
+
+model Order {
+  id                String      @id @default(cuid())
+  tenantId          String
+  number            String // Номер заказа
+  documentDate      DateTime    @default(now())
+  type              OrderType
+  status            OrderStatus @default(DRAFT)
+  customerId        String?
+  contactId         String?
+  vehicleId         String?
+  tachographId      String?
+  description       String?
+  comment           String? // Комментарий для парсинга
+  totalAmount       Decimal     @default(0)
+  isPaid            Boolean     @default(false) // есть ли оплата
+  isShipped         Boolean     @default(false) // произведена ли отгрузка
+  isDocumentsSigned Boolean     @default(false) // подписаны ли отгрузочные документы
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  completedAt       DateTime?
+
+  // Relations
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer       Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  contact        Contact?        @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  vehicle        Vehicle?        @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  tachograph     Tachograph?     @relation(fields: [tachographId], references: [id], onDelete: SetNull)
+  createdBy      User            @relation(fields: [createdById], references: [id])
+  createdById    String
+  tasks          Task[]
+  invoices       Invoice[]
+  orderDocuments OrderDocument[]
+  workflowSteps  WorkflowStep[]
+  documents      Document[]
+  driverCardRequests DriverCardRequest[]
+
+  @@index([tenantId])
+  @@index([number])
+  @@index([status])
+  @@index([customerId])
+  @@index([contactId])
+  @@index([vehicleId])
+}
+
+model OrderDocument {
+  id        String   @id @default(cuid())
+  orderId   String
+  type      String // "passport", "sts", "seal", "sticker", "selfie", "statement"
+  fileUrl   String
+  fileName  String
+  ocrData   Json? // Данные OCR для автозаполнения
+  createdAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+model WorkflowStep {
+  id          String    @id @default(cuid())
+  orderId     String
+  stepType    String // "mchd_check", "photo_upload", "activation", "print"
+  status      String    @default("pending") // "pending", "in_progress", "completed", "failed"
+  data        Json? // Дополнительные данные шага
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+// ==================== TASKS ====================
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CONFIRMED
+  CANCELLED
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  tenantId    String
+  title       String
+  description String?
+  status      TaskStatus @default(PENDING)
+  priority    Int        @default(0)
+  dueDate     DateTime?
+  completedAt DateTime?
+  confirmedAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  // Relations
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  creator    User      @relation("TaskCreator", fields: [creatorId], references: [id])
+  creatorId  String
+  assignee   User?     @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  assigneeId String?
+  vehicle    Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  vehicleId  String?
+  order      Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  orderId    String?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerId String?
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([assigneeId])
+  @@index([creatorId])
+  @@index([customerId])
+}
+
+// ==================== DRIVER CARD REQUESTS (REGISTRY) ====================
+model DriverCardRequest {
+  id                   String                  @id @default(cuid())
+  tenantId             String
+  orderId              String
+  customerId           String
+  createdById          String?
+
+  status               DriverCardRequestStatus @default(DRAFT)
+
+  driverFullName       String?
+  driverPhone          String?
+
+  applicationDate      DateTime?
+  receivedByDriverDate DateTime?
+  expiryDate           DateTime?
+
+  cardNumber           String?
+  pinPackCodes         Json?
+
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+
+  // Relations
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customer  Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  createdBy User?    @relation("DriverCardRequestCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([orderId])
+  @@index([customerId])
+  @@index([status])
+  @@index([expiryDate])
+}
+
+// ==================== DRIVER CARDS ====================
+model DriverCard {
+  id            String   @id @default(cuid())
+  tenantId      String
+  cardNumber    String // Номер карты
+  driverName    String // ФИО водителя
+  driverLicense String? // Номер водительского удостоверения
+  issueDate     DateTime // Дата выдачи
+  expiryDate    DateTime // Дата окончания (3 года)
+  isActive      Boolean  @default(true)
+  documentsUrl  String? // Ссылка на документы (требование ФСБ)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([cardNumber])
+  @@index([expiryDate])
+}
+
+// ==================== CALIBRATION HISTORY ====================
+model CalibrationHistory {
+  id              String   @id @default(cuid())
+  tenantId        String
+  vehicleId       String
+  tachographId    String?
+  calibrationDate DateTime
+  nextCalibration DateTime // +24 месяца
+  certificateUrl  String? // Ссылка на сертификат
+  stickerUrl      String? // Ссылка на наклейку
+  w               String? // Параметр W
+  k               String? // Параметр K
+  l               String? // Параметр L
+  createdAt       DateTime @default(now())
+
+  // Relations
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vehicle    Vehicle     @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  tachograph Tachograph? @relation(fields: [tachographId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([vehicleId])
+  @@index([nextCalibration])
+}
+
+// ==================== FINANCES ====================
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+model Invoice {
+  id                   String        @id @default(cuid())
+  tenantId             String
+  number               String
+  orderId              String?
+  customerId           String?
+  issuerOrganizationId String?
+  status               InvoiceStatus @default(DRAFT)
+  amount               Decimal
+  taxAmount            Decimal       @default(0)
+  totalAmount          Decimal
+  issueDate            DateTime      @default(now())
+  updNumber            String?
+  updDate              DateTime?
+  dueDate              DateTime?
+  paidDate             DateTime?
+  pdfUrl               String? // Ссылка на PDF счета/УПД
+  bankStatementId      String? // ID импортированной выписки
+  isPaid               Boolean       @default(false) // есть ли оплата (дублирование для удобства)
+  isShipped            Boolean       @default(false) // произведена ли отгрузка
+  isDocumentsSigned    Boolean       @default(false) // подписаны ли отгрузочные документы
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  // Relations
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order              Order?              @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  customer           Customer?           @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  issuerOrganization IssuerOrganization? @relation(fields: [issuerOrganizationId], references: [id], onDelete: SetNull)
+  items              InvoiceLineItem[]
+  documents          Document[]
+
+  @@index([tenantId])
+  @@index([number])
+  @@index([status])
+  @@index([customerId])
+  @@index([issuerOrganizationId])
+  @@index([bankStatementId])
+}
+
+model InvoiceLineItem {
+  id        String @id @default(cuid())
+  tenantId  String
+  invoiceId String
+
+  productId String?
+  serviceId String?
+
+  name        String
+  quantity    Decimal @default(1)
+  unit        String?
+  price       Decimal @default(0)
+  vatRate     VatRate @default(VAT_20)
+  vatAmount   Decimal @default(0)
+  totalAmount Decimal @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoice Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  service Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([invoiceId])
+  @@index([productId])
+  @@index([serviceId])
+}
+
+model BankStatement {
+  id          String    @id @default(cuid())
+  tenantId    String
+  fileName    String
+  fileUrl     String
+  importedAt  DateTime  @default(now())
+  processedAt DateTime?
+  invoiceIds  String[] // Массив ID счетов, которые были помечены как оплаченные
+
+  @@index([tenantId])
+}
+
+// ==================== WAREHOUSE ====================
+model WarehouseItem {
+  id           String    @id @default(cuid())
+  tenantId     String
+  name         String
+  category     String? // "skzi", "battery", "card", "other"
+  serialNumber String? // Опционально (ленивый режим)
+  quantity     Int       @default(0)
+  unitPrice    Decimal   @default(0)
+  supplier     String?
+  purchaseDate DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([serialNumber])
+}
+
+// ==================== TRIGGERS & REMINDERS ====================
+enum TriggerType {
+  SKZI_EXPIRY // 35 месяцев
+  CALIBRATION // 24 месяца
+  CARD_EXPIRY // 3 года
+  BATTERY_REPLACEMENT // 2 года
+  CUSTOM // Настраиваемый
+}
+
+enum TriggerStatus {
+  ACTIVE
+  TRIGGERED
+  DISMISSED
+}
+
+model Trigger {
+  id          String        @id @default(cuid())
+  tenantId    String
+  type        TriggerType
+  entityType  String // "vehicle", "tachograph", "card", "skzi"
+  entityId    String
+  triggerDate DateTime // Дата срабатывания
+  daysBefore  Int           @default(30) // За сколько дней напоминать
+  status      TriggerStatus @default(ACTIVE)
+  notifiedAt  DateTime[] // Массив дат уведомлений
+  dismissedAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([triggerDate])
+  @@index([status])
+  @@index([entityType, entityId])
+}
+
+// ==================== AUDIT LOG ====================
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  VIEW
+  LOGIN
+  LOGOUT
+}
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  tenantId   String?
+  userId     String?
+  action     AuditAction
+  entityType String? // "vehicle", "order", "invoice", etc.
+  entityId   String?
+  changes    Json? // Изменения (old -> new)
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime    @default(now())
+
+  // Relations
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+// ==================== COMPLAINTS ====================
+model Complaint {
+  id          String    @id @default(cuid())
+  tenantId    String
+  skziSerial  String // Серийный номер бракованного блока
+  description String
+  orderId     String? // Связь с заказом
+  status      String    @default("pending") // "pending", "sent", "resolved"
+  sentAt      DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
+}
