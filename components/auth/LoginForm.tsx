@@ -67,7 +67,9 @@ export function LoginForm({
       } else if (result?.ok) {
         // A hard redirect is more reliable in production than client routing here:
         // we want to guarantee leaving the login page once the session cookie is set.
-        const to = result.url || successRedirectTo
+        // Note: `result.url` is not always reliable in production and may point back to the login page.
+        // Prefer the explicit success redirect target provided by the page.
+        const to = successRedirectTo
         setLoading(false)
         window.location.assign(to)
       } else {

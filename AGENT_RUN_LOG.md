@@ -4,6 +4,34 @@
 
 ## Последние действия
 
+### 2026-01-25 - Зависание на логине (спиннер) после успешного signIn
+
+- **ПРОБЛЕМА**: После успешного входа (NextAuth credentials) UI иногда зависает на странице логина со спиннером, хотя сессия на бэке уже создана (cookie установлена).
+- **ДИАГНОЗ**: Client-side навигация (`router.push`/`router.refresh`) в этой точке может не переводить приложение на следующий экран в проде, из-за чего форма логина остаётся смонтированной и продолжает показывать loading.
+- **РЕШЕНИЕ**: Сделан hard-redirect после `signIn()` через `window.location.assign(successRedirectTo)`, чтобы гарантированно покинуть страницу логина сразу после установки session cookie.
+- **ИЗМЕНЕНИЯ**:
+  - Обновлён `components/auth/LoginForm.tsx`: успех-ветка логина теперь делает hard-redirect; удалён неиспользуемый `useRouter`.
+- **СТАТУС**:
+  - Commit: `cbb2275` (в `master`), push выполнен.
+  - Локальные pre-push проверки прошли (`tsc --noEmit`, `jest`).
+- **ЧТО ОСТАЛОСЬ**:
+  - Дождаться успешной сборки образа в GitHub Actions (GHCR).
+  - На VPS выполнить обновление: `docker compose -f docker-compose.prod.yml pull && up -d`, затем проверить `/api/health` и ручной логин.
+
+- **ВЫКАТ НА VPS (2026-02-05)**:
+  - Настроен SSH key login для `deploy` (исправлены владельцы/права на `/home/deploy/.ssh/authorized_keys`).
+  - Добавлен `deploy` в группу `docker` (перелогин для применения групп).
+  - GHCR требовал авторизацию при pull → выполнен `docker login ghcr.io` под `deploy`.
+  - Выполнено обновление: `docker compose -f docker-compose.prod.yml pull` → `up -d` (контейнер `tahocrm-app` пересоздан).
+  - Текущий образ `tahocrm-app`: `sha256:161071a368980ff8b1d702dffd05efcf30d6b11accbc6a98bfdf759f88cccb78` (created `2026-02-05T15:16:54Z`).
+  - Проверка: `https://tahoerp.ru/api/health` → `200` `{\"ok\":true,\"db\":\"ok\"}`; страница логина `https://tahoerp.ru/crm/tenant-1/login` → `200`.
+  - Дополнительно: в сборке найдено использование `location.assign` в бандле `LoginForm` (поиск по `/app/.next/...` внутри контейнера).
+
+- **ПРОД-ПОПРАВКА (2026-02-05)**:
+  - Симптом: при правильных данных страница логина "перезагружалась" и оставалась на `.../crm/<tenantId>/login`.
+  - Причина: в проде `signIn(..., { redirect:false })` возвращал `result.url`, указывающий обратно на login-страницу; из-за приоритета `result.url` редирект не уводил с логина.
+  - Фикс: после `result.ok` редиректим строго на `successRedirectTo` (игнорируем `result.url`).
+
 ### 2025-02-05 - Ошибка `Unknown argument 'defaultVatRate'`
 
 - **ПРОБЛЕМА**: При сохранении НДС по умолчанию в настройках возникает ошибка `Invalid prisma.tenant.update() invocation: Unknown argument 'defaultVatRate'`
