@@ -5,6 +5,7 @@ import { logger, logTenantAction } from '@/lib/logger'
 import { handleApiError, ApiError } from '@/lib/api-error-handler'
 import { validateRequest, validateParams } from '@/lib/validation/middleware'
 import { blockTenantSchema, idParamSchema } from '@/lib/validation/schemas'
+import { hasRole } from '@/lib/authz'
 
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const startTime = Date.now()
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     userId = session.user.id
     tenantIdForLog = session.user.tenantId || undefined
 
-    if (session.user.role !== 'SUPER_ADMIN') {
+    if (!hasRole(session.user, 'SUPER_ADMIN')) {
       logger.warn('POST /api/admin/tenants/[id]/block - Forbidden: not super admin', {
         userId: session.user.id,
         role: session.user.role,

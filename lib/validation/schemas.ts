@@ -275,6 +275,7 @@ export const createUserSchema = z.object({
   name: z.string().min(1, 'Имя обязательно').max(200),
   phone: z.string().max(20).optional().nullable(),
   role: userRoleSchema,
+  roles: z.array(userRoleSchema).optional(),
   tenantId: cuidSchema.optional().nullable(),
   isActive: z.boolean().optional(),
 })
@@ -288,6 +289,7 @@ export const updateUserSchema = z
     name: z.string().min(1, 'Имя обязательно').max(200).optional(),
     phone: z.string().max(20).optional().nullable(),
     role: userRoleSchema.optional(),
+    roles: z.array(userRoleSchema).optional(),
     isActive: z.boolean().optional(),
   })
   .partial()

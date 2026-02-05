@@ -6,6 +6,8 @@ import { validateRequest } from '@/lib/validation/middleware'
 import { createUserSchema } from '@/lib/validation/schemas'
 import { handleApiError, ApiError } from '@/lib/api-error-handler'
 import bcrypt from 'bcryptjs'
+import { hasAnyRole, hasRole } from '@/lib/authz'
+import type { UserRole } from '@prisma/client'
 
 export async function GET(request: NextRequest) {
   const path = request.nextUrl.pathname
@@ -20,7 +22,7 @@ export async function GET(request: NextRequest) {
 
     const tenantId = session.user.tenantId
     if (!tenantId) throw new ApiError(400, 'Tenant ID is required', 'TENANT_ID_REQUIRED')
-    if (session.user.role !== 'TENANT_ADMIN' && session.user.role !== 'DIRECTOR') {
+    if (!hasAnyRole(session.user, ['TENANT_ADMIN', 'DIRECTOR'])) {
       throw new ApiError(403, 'Forbidden', 'FORBIDDEN')
     }
 
@@ -37,6 +39,7 @@ export async function GET(request: NextRequest) {
         name: true,
         phone: true,
         role: true,
+        roles: true,
         tenantId: true,
         isActive: true,
         createdAt: true,
@@ -65,7 +68,7 @@ export async function POST(request: NextRequest) {
 
     const tenantId = session.user.tenantId
     if (!tenantId) throw new ApiError(400, 'Tenant ID is required', 'TENANT_ID_REQUIRED')
-    if (session.user.role !== 'TENANT_ADMIN') {
+    if (!hasRole(session.user, 'TENANT_ADMIN')) {
       throw new ApiError(403, 'Forbidden', 'FORBIDDEN')
     }
 
@@ -83,11 +86,18 @@ export async function POST(request: NextRequest) {
 
     const validation = await validateRequest(request, createUserSchema)
     if (validation.error) return validation.error
-    const { email, password, name, phone, role, isActive } = validation.data
+    const { email, password, name, phone, role, roles, isActive } = validation.data
 
     if (role === 'SUPER_ADMIN') {
       throw new ApiError(400, 'Invalid role', 'INVALID_ROLE')
     }
+    if (Array.isArray(roles) && roles.includes('SUPER_ADMIN')) {
+      throw new ApiError(400, 'Invalid role', 'INVALID_ROLE')
+    }
+
+    const extraRoles = Array.from(
+      new Set((roles ?? []).filter(r => r !== 'SUPER_ADMIN' && r !== role))
+    ) as UserRole[]
 
     const prisma = prismaTenant(tenantId)
     const hashedPassword = await bcrypt.hash(password, 10)
@@ -99,6 +109,7 @@ export async function POST(request: NextRequest) {
         name,
         phone: phone ?? null,
         role,
+        roles: extraRoles,
         tenantId,
         isActive: isActive ?? true,
       },
@@ -108,6 +119,7 @@ export async function POST(request: NextRequest) {
         name: true,
         phone: true,
         role: true,
+        roles: true,
         tenantId: true,
         isActive: true,
         createdAt: true,

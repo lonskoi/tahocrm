@@ -3,8 +3,10 @@ import { auth } from '@/auth'
 import { prismaTenant } from '@/lib/prisma'
 import { checkTenantAccess } from '@/lib/tenant-check'
 import { handleApiError, ApiError } from '@/lib/api-error-handler'
+import { hasAnyRole } from '@/lib/authz'
+import type { UserRole } from '@prisma/client'
 
-const READ_ROLES = new Set(['TENANT_ADMIN', 'DIRECTOR', 'MANAGER', 'CARD_SPECIALIST'])
+const READ_ROLES = new Set<UserRole>(['TENANT_ADMIN', 'DIRECTOR', 'MANAGER', 'CARD_SPECIALIST'])
 
 export async function GET(request: NextRequest) {
   const path = request.nextUrl.pathname
@@ -19,7 +21,7 @@ export async function GET(request: NextRequest) {
 
     const tenantId = session.user.tenantId
     if (!tenantId) throw new ApiError(400, 'Tenant ID is required', 'TENANT_ID_REQUIRED')
-    if (!READ_ROLES.has(session.user.role)) throw new ApiError(403, 'Forbidden', 'FORBIDDEN')
+    if (!hasAnyRole(session.user, READ_ROLES)) throw new ApiError(403, 'Forbidden', 'FORBIDDEN')
 
     const access = await checkTenantAccess(tenantId)
     if (!access.allowed)

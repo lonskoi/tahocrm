@@ -8,6 +8,7 @@ import { createTenantSchema } from '@/lib/validation/schemas'
 import { tenantDbName, tenantDatabaseUrl, prismaTenant } from '@/lib/prisma'
 import { Client } from 'pg'
 import { spawn } from 'child_process'
+import { hasRole } from '@/lib/authz'
 
 export async function GET(request: NextRequest) {
   const startTime = Date.now()
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
     userId = session.user.id
     tenantIdForLog = session.user.tenantId || undefined
 
-    if (session.user.role !== 'SUPER_ADMIN') {
+    if (!hasRole(session.user, 'SUPER_ADMIN')) {
       logger.warn('GET /api/admin/tenants - Forbidden: not super admin', {
         userId: session.user.id,
         role: session.user.role,
@@ -159,7 +160,7 @@ export async function POST(request: NextRequest) {
     userId = session.user.id
     tenantIdForLog = session.user.tenantId || undefined
 
-    if (session.user.role !== 'SUPER_ADMIN') {
+    if (!hasRole(session.user, 'SUPER_ADMIN')) {
       throw new ApiError(403, 'Forbidden: Super admin access required', 'FORBIDDEN')
     }
 

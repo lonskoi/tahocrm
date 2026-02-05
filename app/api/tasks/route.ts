@@ -6,6 +6,7 @@ import { handleApiError, ApiError } from '@/lib/api-error-handler'
 import { checkTenantAccess } from '@/lib/tenant-check'
 import { validateRequest } from '@/lib/validation/middleware'
 import { createTaskSchema } from '@/lib/validation/schemas'
+import { hasRole } from '@/lib/authz'
 
 export async function GET(request: NextRequest) {
   const startTime = Date.now()
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
     logApiRequest('GET', path, session.user.id, session.user.tenantId ?? undefined)
 
     const tenantId = session.user.tenantId
-    if (!tenantId && session.user.role !== 'SUPER_ADMIN') {
+    if (!tenantId && !hasRole(session.user, 'SUPER_ADMIN')) {
       logger.warn('GET /api/tasks - Tenant ID required', {
         userId: session.user.id,
         role: session.user.role,
@@ -142,7 +143,7 @@ export async function POST(request: NextRequest) {
     logApiRequest('POST', path, session.user.id, session.user.tenantId ?? undefined)
 
     const tenantId = session.user.tenantId
-    if (!tenantId && session.user.role !== 'SUPER_ADMIN') {
+    if (!tenantId && !hasRole(session.user, 'SUPER_ADMIN')) {
       logger.warn('POST /api/tasks - Tenant ID required', {
         userId: session.user.id,
         role: session.user.role,

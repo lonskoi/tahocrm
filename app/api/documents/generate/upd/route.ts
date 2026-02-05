@@ -10,11 +10,19 @@ import path from 'path'
 import os from 'os'
 import { mkdtemp, rm, writeFile, readFile as readFileFs } from 'fs/promises'
 import { spawn } from 'child_process'
+import { hasAnyRole } from '@/lib/authz'
+import type { UserRole } from '@prisma/client'
 
 // Ensure Node.js runtime (ExcelJS + child_process)
 export const runtime = 'nodejs'
 
-const READ_ROLES = new Set(['TENANT_ADMIN', 'DIRECTOR', 'MANAGER', 'MASTER', 'CARD_SPECIALIST'])
+const READ_ROLES = new Set<UserRole>([
+  'TENANT_ADMIN',
+  'DIRECTOR',
+  'MANAGER',
+  'MASTER',
+  'CARD_SPECIALIST',
+])
 
 function vatRateToNumber(rate: VatRate): number {
   if (rate === 'VAT_5') return 0.05
@@ -300,7 +308,7 @@ export async function GET(request: NextRequest) {
 
     const tenantId = session.user.tenantId
     if (!tenantId) throw new ApiError(400, 'Tenant ID is required', 'TENANT_ID_REQUIRED')
-    if (!READ_ROLES.has(session.user.role)) throw new ApiError(403, 'Forbidden', 'FORBIDDEN')
+    if (!hasAnyRole(session.user, READ_ROLES)) throw new ApiError(403, 'Forbidden', 'FORBIDDEN')
 
     const access = await checkTenantAccess(tenantId)
     if (!access.allowed)
@@ -473,7 +481,7 @@ export async function GET(request: NextRequest) {
     let pdfBuffer: Buffer
     try {
       pdfBuffer = await convertXlsxBufferToPdf(xlsxBuffer)
-    } catch (e) {
+    } catch {
       throw new ApiError(
         501,
         'PDF generation is not available on this server (LibreOffice soffice is required).',

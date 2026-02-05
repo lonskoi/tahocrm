@@ -6,6 +6,8 @@ import { validateRequest } from '@/lib/validation/middleware'
 import { updateUserSchema } from '@/lib/validation/schemas'
 import { handleApiError, ApiError } from '@/lib/api-error-handler'
 import bcrypt from 'bcryptjs'
+import { hasRole } from '@/lib/authz'
+import type { UserRole } from '@prisma/client'
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const path = request.nextUrl.pathname
@@ -20,7 +22,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 
     const tenantId = session.user.tenantId
     if (!tenantId) throw new ApiError(400, 'Tenant ID is required', 'TENANT_ID_REQUIRED')
-    if (session.user.role !== 'TENANT_ADMIN') throw new ApiError(403, 'Forbidden', 'FORBIDDEN')
+    if (!hasRole(session.user, 'TENANT_ADMIN')) throw new ApiError(403, 'Forbidden', 'FORBIDDEN')
 
     const access = await checkTenantAccess(tenantId)
     if (!access.allowed)
@@ -30,9 +32,11 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 
     const validation = await validateRequest(request, updateUserSchema)
     if (validation.error) return validation.error
-    const { email, password, name, phone, role, isActive } = validation.data
+    const { email, password, name, phone, role, roles, isActive } = validation.data
 
     if (role === 'SUPER_ADMIN') throw new ApiError(400, 'Invalid role', 'INVALID_ROLE')
+    if (Array.isArray(roles) && roles.includes('SUPER_ADMIN'))
+      throw new ApiError(400, 'Invalid role', 'INVALID_ROLE')
 
     const data: Record<string, unknown> = {}
     if (typeof email === 'string') data.email = email
@@ -43,8 +47,19 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     if (typeof password === 'string') data.password = await bcrypt.hash(password, 10)
 
     const prisma = prismaTenant(tenantId)
-    const existing = await prisma.user.findFirst({ where: { id, tenantId }, select: { id: true } })
+    const existing = await prisma.user.findFirst({
+      where: { id, tenantId },
+      select: { id: true, role: true },
+    })
     if (!existing) throw new ApiError(404, 'Not found', 'NOT_FOUND')
+
+    const primaryRole = (typeof role === 'string' ? role : existing.role) as UserRole
+    if (roles !== undefined) {
+      const extraRoles = Array.from(
+        new Set((roles ?? []).filter(r => r !== 'SUPER_ADMIN' && r !== primaryRole))
+      ) as UserRole[]
+      data.roles = extraRoles
+    }
 
     const updated = await prisma.user.update({
       where: { id },
@@ -55,6 +70,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         name: true,
         phone: true,
         role: true,
+        roles: true,
         tenantId: true,
         isActive: true,
         createdAt: true,
@@ -82,7 +98,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
 
     const tenantId = session.user.tenantId
     if (!tenantId) throw new ApiError(400, 'Tenant ID is required', 'TENANT_ID_REQUIRED')
-    if (session.user.role !== 'TENANT_ADMIN') throw new ApiError(403, 'Forbidden', 'FORBIDDEN')
+    if (!hasRole(session.user, 'TENANT_ADMIN')) throw new ApiError(403, 'Forbidden', 'FORBIDDEN')
 
     const access = await checkTenantAccess(tenantId)
     if (!access.allowed)

@@ -13,6 +13,7 @@ type UserRow = {
   name: string
   phone: string | null
   role: UserRole
+  roles: UserRole[]
   tenantId: string | null
   isActive: boolean
   createdAt: string
@@ -29,6 +30,14 @@ const ROLE_OPTIONS: Array<{ value: Exclude<UserRole, 'SUPER_ADMIN'>; label: stri
   { value: 'CLIENT', label: 'Клиент' },
 ]
 
+const ROLE_LABEL: Record<Exclude<UserRole, 'SUPER_ADMIN'>, string> = ROLE_OPTIONS.reduce(
+  (acc, r) => {
+    acc[r.value] = r.label
+    return acc
+  },
+  {} as Record<Exclude<UserRole, 'SUPER_ADMIN'>, string>
+)
+
 export default function UsersPage() {
   const params = useParams<{ tenantId: string }>()
   const tenantId = params?.tenantId
@@ -44,7 +53,8 @@ export default function UsersPage() {
   const [formPassword, setFormPassword] = useState('')
   const [formName, setFormName] = useState('')
   const [formPhone, setFormPhone] = useState('')
-  const [formRole, setFormRole] = useState<Exclude<UserRole, 'SUPER_ADMIN'>>('MANAGER')
+  const [formRole, setFormRole] = useState<Exclude<UserRole, 'SUPER_ADMIN'>>('MANAGER') // primary
+  const [formRoles, setFormRoles] = useState<Array<Exclude<UserRole, 'SUPER_ADMIN'>>>([]) // additional
   const [formIsActive, setFormIsActive] = useState(true)
 
   const sortedUsers = useMemo(() => {
@@ -79,6 +89,7 @@ export default function UsersPage() {
     setFormName('')
     setFormPhone('')
     setFormRole('MANAGER')
+    setFormRoles([])
     setFormIsActive(true)
     setIsModalOpen(true)
   }
@@ -90,8 +101,23 @@ export default function UsersPage() {
     setFormName(u.name)
     setFormPhone(u.phone ?? '')
     setFormRole(u.role as Exclude<UserRole, 'SUPER_ADMIN'>)
+    setFormRoles(
+      ((u.roles ?? []) as UserRole[]).filter(r => r !== u.role) as Array<
+        Exclude<UserRole, 'SUPER_ADMIN'>
+      >
+    )
     setFormIsActive(u.isActive)
     setIsModalOpen(true)
+  }
+
+  function toggleExtraRole(r: Exclude<UserRole, 'SUPER_ADMIN'>) {
+    if (r === formRole) return
+    setFormRoles(prev => (prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r]))
+  }
+
+  function setPrimaryRole(r: Exclude<UserRole, 'SUPER_ADMIN'>) {
+    setFormRole(r)
+    setFormRoles(prev => prev.filter(x => x !== r))
   }
 
   async function save() {
@@ -110,6 +136,7 @@ export default function UsersPage() {
             name: formName,
             phone: formPhone || null,
             role: formRole,
+            roles: formRoles,
             isActive: formIsActive,
           }),
         })
@@ -121,6 +148,7 @@ export default function UsersPage() {
           name: formName,
           phone: formPhone || null,
           role: formRole,
+          roles: formRoles,
           isActive: formIsActive,
         }
         if (formPassword) body.password = formPassword
@@ -196,7 +224,20 @@ export default function UsersPage() {
                 <td className="px-4 py-3 font-medium text-gray-900">{u.name}</td>
                 <td className="px-4 py-3 text-gray-700">{u.email}</td>
                 <td className="px-4 py-3 text-gray-700">{u.phone ?? '—'}</td>
-                <td className="px-4 py-3 text-gray-700">{u.role}</td>
+                <td className="px-4 py-3 text-gray-700">
+                  <div className="text-gray-900">
+                    {ROLE_LABEL[u.role as Exclude<UserRole, 'SUPER_ADMIN'>] ?? u.role}
+                  </div>
+                  {Array.isArray(u.roles) && u.roles.length > 0 ? (
+                    <div className="text-xs text-gray-500">
+                      доп.:{' '}
+                      {u.roles
+                        .filter(r => r !== u.role)
+                        .map(r => ROLE_LABEL[r as Exclude<UserRole, 'SUPER_ADMIN'>] ?? r)
+                        .join(', ')}
+                    </div>
+                  ) : null}
+                </td>
                 <td className="px-4 py-3 text-gray-700">{u.isActive ? 'Да' : 'Нет'}</td>
                 <td className="px-4 py-3 text-right">
                   <div className="inline-flex gap-2">
@@ -249,24 +290,46 @@ export default function UsersPage() {
           <Input label="Телефон" value={formPhone} onChange={e => setFormPhone(e.target.value)} />
 
           <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-            <div className="text-sm font-semibold text-gray-900 mb-3">Роль (галочками)</div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <div className="text-sm font-semibold text-gray-900 mb-3">Роли</div>
+
+            <label className="block text-sm font-medium text-gray-700 mb-1">Основная роль</label>
+            <select
+              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm"
+              value={formRole}
+              onChange={e => setPrimaryRole(e.target.value as Exclude<UserRole, 'SUPER_ADMIN'>)}
+            >
               {ROLE_OPTIONS.map(opt => (
-                <label
-                  key={opt.value}
-                  className="flex items-center gap-3 rounded-lg bg-white px-3 py-2 border border-gray-200"
-                >
-                  <input
-                    type="checkbox"
-                    checked={formRole === opt.value}
-                    onChange={() => setFormRole(opt.value)}
-                  />
-                  <span className="text-sm text-gray-800">{opt.label}</span>
-                </label>
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
               ))}
-            </div>
-            <div className="mt-3 text-xs text-gray-500">
-              Сейчас у пользователя может быть только одна роль (выберите одну галочку).
+            </select>
+
+            <div className="mt-4">
+              <div className="text-sm font-medium text-gray-700 mb-2">Дополнительные роли</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {ROLE_OPTIONS.map(opt => (
+                  <label
+                    key={opt.value}
+                    className={[
+                      'flex items-center gap-3 rounded-lg bg-white px-3 py-2 border border-gray-200',
+                      opt.value === formRole ? 'opacity-60' : '',
+                    ].join(' ')}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={formRoles.includes(opt.value)}
+                      disabled={opt.value === formRole}
+                      onChange={() => toggleExtraRole(opt.value)}
+                    />
+                    <span className="text-sm text-gray-800">{opt.label}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="mt-3 text-xs text-gray-500">
+                Основная роль определяет “рабочий стол по умолчанию”. Дополнительные роли дают
+                доступ к разделам по принципу union permissions.
+              </div>
             </div>
           </div>
 

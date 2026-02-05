@@ -5,6 +5,7 @@ import { checkTenantAccess } from '@/lib/tenant-check'
 import { handleApiError, ApiError } from '@/lib/api-error-handler'
 import { validateRequest } from '@/lib/validation/middleware'
 import { updateCatalogItemSchema } from '@/lib/validation/schemas'
+import { hasRole } from '@/lib/authz'
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const path = request.nextUrl.pathname
@@ -18,7 +19,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 
     const tenantId = session.user.tenantId
     if (!tenantId) throw new ApiError(400, 'Tenant ID is required', 'TENANT_ID_REQUIRED')
-    if (session.user.role !== 'TENANT_ADMIN') throw new ApiError(403, 'Forbidden', 'FORBIDDEN')
+    if (!hasRole(session.user, 'TENANT_ADMIN')) throw new ApiError(403, 'Forbidden', 'FORBIDDEN')
 
     const access = await checkTenantAccess(tenantId)
     if (!access.allowed)
@@ -65,7 +66,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
 
     const tenantId = session.user.tenantId
     if (!tenantId) throw new ApiError(400, 'Tenant ID is required', 'TENANT_ID_REQUIRED')
-    if (session.user.role !== 'TENANT_ADMIN') throw new ApiError(403, 'Forbidden', 'FORBIDDEN')
+    if (!hasRole(session.user, 'TENANT_ADMIN')) throw new ApiError(403, 'Forbidden', 'FORBIDDEN')
 
     const access = await checkTenantAccess(tenantId)
     if (!access.allowed)

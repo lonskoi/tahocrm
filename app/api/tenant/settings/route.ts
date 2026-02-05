@@ -4,6 +4,7 @@ import { prismaMaster } from '@/lib/prisma'
 import { checkTenantAccess } from '@/lib/tenant-check'
 import { handleApiError, ApiError } from '@/lib/api-error-handler'
 import { validateRequest } from '@/lib/validation/middleware'
+import { hasRole } from '@/lib/authz'
 import { z } from 'zod'
 import type { VatRate } from '@prisma/client'
 
@@ -74,7 +75,7 @@ export async function PUT(request: NextRequest) {
     if (!tenantId) throw new ApiError(400, 'Tenant ID is required', 'TENANT_ID_REQUIRED')
 
     // Только TENANT_ADMIN может изменять настройки
-    if (session.user.role !== 'TENANT_ADMIN') {
+    if (!hasRole(session.user, 'TENANT_ADMIN')) {
       throw new ApiError(403, 'Forbidden: Tenant admin access required', 'FORBIDDEN')
     }
 

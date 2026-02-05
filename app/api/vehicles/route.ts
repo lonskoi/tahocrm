@@ -7,8 +7,10 @@ import { validateRequest } from '@/lib/validation/middleware'
 import { createVehicleCrmSchema } from '@/lib/validation/schemas'
 import { logChange } from '@/lib/audit'
 import { normalizeGovNumberLike } from '@/lib/utils'
+import { hasAnyRole } from '@/lib/authz'
+import type { UserRole } from '@prisma/client'
 
-const WRITE_ROLES = new Set(['TENANT_ADMIN', 'DIRECTOR', 'MANAGER', 'MASTER'])
+const WRITE_ROLES = new Set<UserRole>(['TENANT_ADMIN', 'DIRECTOR', 'MANAGER', 'MASTER'])
 
 export async function GET(request: NextRequest) {
   const path = request.nextUrl.pathname
@@ -56,7 +58,7 @@ export async function POST(request: NextRequest) {
 
     const tenantId = session.user.tenantId
     if (!tenantId) throw new ApiError(400, 'Tenant ID is required', 'TENANT_ID_REQUIRED')
-    if (!WRITE_ROLES.has(session.user.role)) throw new ApiError(403, 'Forbidden', 'FORBIDDEN')
+    if (!hasAnyRole(session.user, WRITE_ROLES)) throw new ApiError(403, 'Forbidden', 'FORBIDDEN')
 
     const access = await checkTenantAccess(tenantId)
     if (!access.allowed)

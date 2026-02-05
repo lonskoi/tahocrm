@@ -453,6 +453,8 @@ model User {
   name      String
   phone     String?
   role      UserRole
+  // Additional roles for union permissions (primary role stays in `role`)
+  roles     UserRole[] @default([])
   tenantId  String? // null для SUPER_ADMIN
   isActive  Boolean   @default(true)
   createdAt DateTime  @default(now())

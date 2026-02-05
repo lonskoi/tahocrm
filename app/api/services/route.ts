@@ -6,6 +6,7 @@ import { handleApiError, ApiError } from '@/lib/api-error-handler'
 import { validateRequest } from '@/lib/validation/middleware'
 import { createCatalogItemSchema } from '@/lib/validation/schemas'
 import type { VatRate } from '@prisma/client'
+import { hasRole } from '@/lib/authz'
 
 export async function GET(request: NextRequest) {
   const path = request.nextUrl.pathname
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
 
     const tenantId = session.user.tenantId
     if (!tenantId) throw new ApiError(400, 'Tenant ID is required', 'TENANT_ID_REQUIRED')
-    if (session.user.role !== 'TENANT_ADMIN') throw new ApiError(403, 'Forbidden', 'FORBIDDEN')
+    if (!hasRole(session.user, 'TENANT_ADMIN')) throw new ApiError(403, 'Forbidden', 'FORBIDDEN')
 
     const access = await checkTenantAccess(tenantId)
     if (!access.allowed)

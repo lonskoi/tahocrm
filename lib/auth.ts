@@ -81,6 +81,7 @@ export const authOptions: NextAuthConfig = {
                 email: user.email,
                 name: user.name,
                 role: user.role,
+                roles: (user as unknown as { roles?: UserRole[] | null }).roles ?? [],
                 tenantId: user.tenantId,
               }
             }
@@ -116,6 +117,7 @@ export const authOptions: NextAuthConfig = {
                   email: created.email,
                   name: created.name,
                   role: created.role,
+                  roles: [],
                   tenantId: created.tenantId,
                 }
               }
@@ -132,6 +134,7 @@ export const authOptions: NextAuthConfig = {
               email: 'admin@test.com',
               name: 'Администратор',
               role: 'SUPER_ADMIN',
+              roles: [],
               tenantId: null,
             }
           }
@@ -179,6 +182,7 @@ export const authOptions: NextAuthConfig = {
             email: user.email,
             name: user.name,
             role: user.role,
+            roles: (user as unknown as { roles?: UserRole[] | null }).roles ?? [],
             tenantId: user.tenantId,
           }
         } catch (error) {
@@ -196,6 +200,7 @@ export const authOptions: NextAuthConfig = {
       if (user) {
         token.id = user.id
         token.role = (user as { role: UserRole }).role
+        token.roles = (user as unknown as { roles?: UserRole[] | null }).roles ?? []
         token.tenantId = (user as { tenantId: string | null }).tenantId
       }
       return token
@@ -204,6 +209,7 @@ export const authOptions: NextAuthConfig = {
       if (session.user && token.id && token.role) {
         session.user.id = token.id as string
         session.user.role = token.role as UserRole
+        session.user.roles = (token as unknown as { roles?: UserRole[] | null }).roles ?? []
         session.user.tenantId = token.tenantId as string | null
       }
       return session
