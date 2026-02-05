@@ -18,6 +18,9 @@ RUN npm run build
 FROM base AS migrator
 ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
+# Prisma Client must be generated for scripts that import @prisma/client.
+# Builder stage runs `npm run db:generate`, which outputs `node_modules/.prisma`.
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY prisma ./prisma
 COPY scripts ./scripts
 COPY lib ./lib

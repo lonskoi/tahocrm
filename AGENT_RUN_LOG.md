@@ -31,6 +31,15 @@
   - Симптом: при правильных данных страница логина "перезагружалась" и оставалась на `.../crm/<tenantId>/login`.
   - Причина: в проде `signIn(..., { redirect:false })` возвращал `result.url`, указывающий обратно на login-страницу; из-за приоритета `result.url` редирект не уводил с логина.
   - Фикс: после `result.ok` редиректим строго на `successRedirectTo` (игнорируем `result.url`).
+  - Код: commit `00af40c` (push в `master`), образ обновлён на VPS: `sha256:2b646b0c2ce2...` (created `2026-02-05T17:03:45Z`).
+  - Проверка: `https://tahoerp.ru/api/health` → `200` `{\"ok\":true,\"db\":\"ok\"}` после перезапуска контейнера.
+
+- **ДИАГНОСТИКА (2026-02-05)**:
+  - Симптом: после попытки входа снова возвращает на страницу логина.
+  - Логи `tahocrm-app`: `[auth][error] CredentialsSignin` → credentials provider возвращает `null` (пользователь не найден / пароль не совпал).
+  - Найдена проблема инфраструктуры: контейнер `migrator` не может запускать `tsx scripts/create-tenant-admin.ts` из-за отсутствия сгенерированного Prisma Client:
+    - `Error: Cannot find module '.prisma/client/default'` (в `migrator` нет `node_modules/.prisma`).
+  - Фикс: в `Dockerfile` для stage `migrator` добавлено копирование `node_modules/.prisma` из builder stage.
 
 ### 2025-02-05 - Ошибка `Unknown argument 'defaultVatRate'`
 
