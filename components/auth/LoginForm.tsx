@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,7 +25,6 @@ export function LoginForm({
   tenantId,
   successRedirectTo,
 }: Props) {
-  const router = useRouter()
   const [email, setEmail] = useState(defaultEmail)
   const [password, setPassword] = useState(defaultPassword)
   const [error, setError] = useState('')
@@ -67,8 +65,11 @@ export function LoginForm({
         setError('Неверный email или пароль')
         setLoading(false)
       } else if (result?.ok) {
-        router.push(successRedirectTo)
-        router.refresh()
+        // A hard redirect is more reliable in production than client routing here:
+        // we want to guarantee leaving the login page once the session cookie is set.
+        const to = result.url || successRedirectTo
+        setLoading(false)
+        window.location.assign(to)
       } else {
         setError('Произошла ошибка при входе')
         setLoading(false)
