@@ -41,10 +41,19 @@ export async function middleware(request: NextRequest) {
   if (!isPlatform && !isCrm) return NextResponse.next()
 
   try {
-    const token = await getToken({
-      req: request,
-      secret: process.env.NEXTAUTH_SECRET || 'development-secret-key-change-in-production',
-    })
+    // NextAuth/Auth.js v5 uses `authjs.*` cookies (and `__Secure-` prefix on HTTPS).
+    // `getToken` defaults are v4-ish, so we set cookie name explicitly to avoid
+    // treating authenticated requests as unauthenticated and redirecting back to login.
+    const secret =
+      process.env.AUTH_SECRET ||
+      process.env.NEXTAUTH_SECRET ||
+      'development-secret-key-change-in-production'
+    const isSecure =
+      request.nextUrl.protocol === 'https:' ||
+      (process.env.NEXTAUTH_URL ?? '').startsWith('https://')
+    const cookieName = isSecure ? '__Secure-authjs.session-token' : 'authjs.session-token'
+
+    const token = await getToken({ req: request, secret, cookieName })
 
     if (!token) {
       if (

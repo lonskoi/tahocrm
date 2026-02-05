@@ -41,6 +41,12 @@
     - `Error: Cannot find module '.prisma/client/default'` (в `migrator` нет `node_modules/.prisma`).
   - Фикс: в `Dockerfile` для stage `migrator` добавлено копирование `node_modules/.prisma` из builder stage.
 
+- **ДИАГНОСТИКА (2026-02-05) — сессия есть, но middleware редиректит на login**:
+  - Факт: credentials sign-in выставляет `__Secure-authjs.session-token`, и `/api/auth/session` возвращает user (проверено curl+cookie-jar).
+  - Но запрос `GET /crm/tenant-1` даже с cookie получал `307 -> /crm/tenant-1/login`.
+  - Причина: `middleware.ts` использовал `getToken()` с дефолтными cookie-настройками (v4), из-за чего токен из `authjs.*` cookie не читался → `token=null`.
+  - Фикс: в `middleware.ts` задан `cookieName` для Auth.js v5 (`__Secure-authjs.session-token` на HTTPS / `authjs.session-token` на HTTP) и `secret` берётся из `AUTH_SECRET || NEXTAUTH_SECRET`.
+
 ### 2025-02-05 - Ошибка `Unknown argument 'defaultVatRate'`
 
 - **ПРОБЛЕМА**: При сохранении НДС по умолчанию в настройках возникает ошибка `Invalid prisma.tenant.update() invocation: Unknown argument 'defaultVatRate'`
