@@ -14,8 +14,13 @@ export const authOptions: NextAuthConfig = {
         tenantId: { label: 'Tenant ID', type: 'text' },
       },
       async authorize(credentials) {
+        const startedAt = Date.now()
         try {
           if (!credentials?.email || !credentials?.password) {
+            console.warn('[auth] credentials authorize: missing email/password', {
+              tenantId: (credentials as { tenantId?: unknown })?.tenantId,
+              durationMs: Date.now() - startedAt,
+            })
             return null
           }
 
@@ -28,14 +33,47 @@ export const authOptions: NextAuthConfig = {
           if (tenantId) {
             const prisma = prismaTenant(tenantId)
             const user = await prisma.user.findUnique({ where: { email } })
+            if (!user) {
+              console.warn('[auth] credentials authorize: tenant user not found', {
+                tenantId,
+                email,
+                durationMs: Date.now() - startedAt,
+              })
+              return null
+            }
+            if (!user.isActive) {
+              console.warn('[auth] credentials authorize: tenant user inactive', {
+                tenantId,
+                email,
+                userId: user.id,
+                durationMs: Date.now() - startedAt,
+              })
+              return null
+            }
             if (user && user.isActive) {
               const ok = await bcrypt.compare(password, user.password)
-              if (!ok) return null
+              if (!ok) {
+                console.warn('[auth] credentials authorize: tenant password mismatch', {
+                  tenantId,
+                  email,
+                  userId: user.id,
+                  durationMs: Date.now() - startedAt,
+                })
+                return null
+              }
 
               // best-effort lastLogin
               await prisma.user
                 .update({ where: { id: user.id }, data: { lastLogin: new Date() } })
                 .catch(() => {})
+
+              console.warn('[auth] credentials authorize: tenant ok', {
+                tenantId,
+                email,
+                userId: user.id,
+                role: user.role,
+                durationMs: Date.now() - startedAt,
+              })
 
               return {
                 id: user.id,
@@ -99,13 +137,41 @@ export const authOptions: NextAuthConfig = {
 
           // Platform login: /platform/login (master DB)
           const user = await prismaMaster.user.findUnique({ where: { email } })
-          if (!user || !user.isActive) return null
+          if (!user) {
+            console.warn('[auth] credentials authorize: platform user not found', {
+              email,
+              durationMs: Date.now() - startedAt,
+            })
+            return null
+          }
+          if (!user.isActive) {
+            console.warn('[auth] credentials authorize: platform user inactive', {
+              email,
+              userId: user.id,
+              durationMs: Date.now() - startedAt,
+            })
+            return null
+          }
           const ok = await bcrypt.compare(password, user.password)
-          if (!ok) return null
+          if (!ok) {
+            console.warn('[auth] credentials authorize: platform password mismatch', {
+              email,
+              userId: user.id,
+              durationMs: Date.now() - startedAt,
+            })
+            return null
+          }
 
           await prismaMaster.user
             .update({ where: { id: user.id }, data: { lastLogin: new Date() } })
             .catch(() => {})
+
+          console.warn('[auth] credentials authorize: platform ok', {
+            email,
+            userId: user.id,
+            role: user.role,
+            durationMs: Date.now() - startedAt,
+          })
 
           return {
             id: user.id,
@@ -115,6 +181,9 @@ export const authOptions: NextAuthConfig = {
             tenantId: user.tenantId,
           }
         } catch {
+          console.warn('[auth] credentials authorize: exception', {
+            durationMs: Date.now() - startedAt,
+          })
           return null
         }
       },

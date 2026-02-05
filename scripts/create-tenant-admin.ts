@@ -30,8 +30,17 @@ async function main() {
   })
 
   try {
-    const admin = await prisma.user.create({
-      data: {
+    // Idempotent: if user exists, update password/role/tenantId/isActive.
+    const admin = await prisma.user.upsert({
+      where: { email },
+      update: {
+        password: hashedPassword,
+        name,
+        role: 'TENANT_ADMIN',
+        tenantId,
+        isActive: true,
+      },
+      create: {
         email,
         password: hashedPassword,
         name,
@@ -41,25 +50,14 @@ async function main() {
       },
     })
 
-    console.log('✅ TENANT_ADMIN создан успешно!')
+    console.log('✅ TENANT_ADMIN синхронизирован успешно!')
     console.log('Tenant:', tenantId)
     console.log('Email:', admin.email)
     console.log('Пароль:', password)
     console.log('URL для входа:', `http://localhost:3000/crm/${tenantId}/login`)
   } catch (error: unknown) {
-    const code =
-      typeof error === 'object' && error && 'code' in error
-        ? (error as { code?: unknown }).code
-        : undefined
-
-    if (code === 'P2002') {
-      console.log('⚠️  Пользователь с таким email уже существует в tenant DB')
-      console.log('Tenant:', tenantId)
-      console.log('Email:', email)
-    } else {
-      console.error('❌ Ошибка при создании TENANT_ADMIN:', error)
-      process.exitCode = 1
-    }
+    console.error('❌ Ошибка при синхронизации TENANT_ADMIN:', error)
+    process.exitCode = 1
   } finally {
     await prisma.$disconnect().catch(() => {})
     await prismaMaster.$disconnect().catch(() => {})
