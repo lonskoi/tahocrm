@@ -39,6 +39,9 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
+# Ensure bcryptjs exists at runtime (standalone tracing can omit it)
+COPY --from=deps /app/node_modules/bcryptjs ./node_modules/bcryptjs
+
 USER nextjs
 EXPOSE 3000
 CMD ["node", "server.js"]
