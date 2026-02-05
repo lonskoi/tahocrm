@@ -2,6 +2,30 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 
+async function resolveAuthToken(request: NextRequest) {
+  // NextAuth/Auth.js v5 uses `authjs.*` cookies (and `__Secure-` prefix on HTTPS).
+  // `getToken` defaults are v4-ish, and behind a reverse proxy Next.js may see the request
+  // as http even if the browser uses https. To be robust, try common cookie names.
+  const secret =
+    process.env.AUTH_SECRET ||
+    process.env.NEXTAUTH_SECRET ||
+    'development-secret-key-change-in-production'
+
+  const cookieNames = [
+    '__Secure-authjs.session-token',
+    'authjs.session-token',
+    // legacy fallback (just in case)
+    '__Secure-next-auth.session-token',
+    'next-auth.session-token',
+  ] as const
+
+  for (const cookieName of cookieNames) {
+    const token = await getToken({ req: request, secret, cookieName })
+    if (token) return token
+  }
+  return null
+}
+
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname
   const segments = path.split('/').filter(Boolean)
@@ -41,29 +65,7 @@ export async function middleware(request: NextRequest) {
   if (!isPlatform && !isCrm) return NextResponse.next()
 
   try {
-    // NextAuth/Auth.js v5 uses `authjs.*` cookies (and `__Secure-` prefix on HTTPS).
-    // `getToken` defaults are v4-ish, so we set cookie name explicitly to avoid
-    // treating authenticated requests as unauthenticated and redirecting back to login.
-    const secret =
-      process.env.AUTH_SECRET ||
-      process.env.NEXTAUTH_SECRET ||
-      'development-secret-key-change-in-production'
-    // Behind a reverse proxy (e.g. Caddy), Next.js may see the request as http even if
-    // the browser uses https. Also, cookies sent by the browser keep their `__Secure-`
-    // prefix. To be robust, try both cookie names.
-    const cookieNames = [
-      '__Secure-authjs.session-token',
-      'authjs.session-token',
-      // legacy fallback (just in case)
-      '__Secure-next-auth.session-token',
-      'next-auth.session-token',
-    ] as const
-
-    let token: Awaited<ReturnType<typeof getToken>> = null
-    for (const cookieName of cookieNames) {
-      token = await getToken({ req: request, secret, cookieName })
-      if (token) break
-    }
+    const token = await resolveAuthToken(request)
 
     if (!token) {
       if (

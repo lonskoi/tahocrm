@@ -1,22 +1,67 @@
-// Простой логгер без сложных зависимостей
-const isDevelopment = process.env.NODE_ENV === 'development'
+// Простой структурированный логгер без сложных зависимостей.
+// В разработке логи — основной инструмент диагностики, поэтому:
+// - в production по умолчанию логируем info/warn/error
+// - debug включается через LOG_LEVEL=debug
+
+type LogLevel = 'debug' | 'info' | 'warn' | 'error'
+
+const levelWeight: Record<LogLevel, number> = {
+  debug: 10,
+  info: 20,
+  warn: 30,
+  error: 40,
+}
+
+function normalizeLevel(v: string | undefined): LogLevel | null {
+  const raw = (v ?? '').trim().toLowerCase()
+  if (raw === 'debug' || raw === 'info' || raw === 'warn' || raw === 'error') return raw
+  return null
+}
+
+const defaultLevel: LogLevel = process.env.NODE_ENV === 'development' ? 'debug' : 'info'
+const minLevel: LogLevel = normalizeLevel(process.env.LOG_LEVEL) ?? defaultLevel
+
+function shouldLog(level: LogLevel): boolean {
+  return levelWeight[level] >= levelWeight[minLevel]
+}
+
+function emit(level: LogLevel, message: string, meta?: Record<string, unknown>) {
+  if (!shouldLog(level)) return
+  const ts = new Date().toISOString()
+  const prefix = `${ts} [${level.toUpperCase()}]`
+
+  const out = meta ? { ...meta } : undefined
+  // Keep logs readable: message always first.
+  const line = `${prefix} ${message}`
+
+  if (level === 'error') {
+    // console.error keeps stack traces in container logs.
+    out ? console.error(line, out) : console.error(line)
+    return
+  }
+  if (level === 'warn') {
+    out ? console.warn(line, out) : console.warn(line)
+    return
+  }
+  if (level === 'debug') {
+    out ? console.log(line, out) : console.log(line)
+    return
+  }
+  out ? console.log(line, out) : console.log(line)
+}
 
 export const logger = {
   info: (message: string, meta?: Record<string, unknown>) => {
-    if (isDevelopment) {
-      console.log(`[INFO] ${message}`, meta || '')
-    }
+    emit('info', message, meta)
   },
   warn: (message: string, meta?: Record<string, unknown>) => {
-    console.warn(`[WARN] ${message}`, meta || '')
+    emit('warn', message, meta)
   },
   error: (message: string, meta?: Record<string, unknown>) => {
-    console.error(`[ERROR] ${message}`, meta || '')
+    emit('error', message, meta)
   },
   debug: (message: string, meta?: Record<string, unknown>) => {
-    if (isDevelopment) {
-      console.log(`[DEBUG] ${message}`, meta || '')
-    }
+    emit('debug', message, meta)
   },
 }
 

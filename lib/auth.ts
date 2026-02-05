@@ -3,6 +3,7 @@ import Credentials from 'next-auth/providers/credentials'
 import type { UserRole } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { prismaMaster, prismaTenant } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
 
 export const authOptions: NextAuthConfig = {
   providers: [
@@ -17,7 +18,7 @@ export const authOptions: NextAuthConfig = {
         const startedAt = Date.now()
         try {
           if (!credentials?.email || !credentials?.password) {
-            console.warn('[auth] credentials authorize: missing email/password', {
+            logger.warn('auth.credentials.authorize: missing email/password', {
               tenantId: (credentials as { tenantId?: unknown })?.tenantId,
               durationMs: Date.now() - startedAt,
             })
@@ -34,7 +35,7 @@ export const authOptions: NextAuthConfig = {
             const prisma = prismaTenant(tenantId)
             const user = await prisma.user.findUnique({ where: { email } })
             if (!user) {
-              console.warn('[auth] credentials authorize: tenant user not found', {
+              logger.warn('auth.credentials.authorize: tenant user not found', {
                 tenantId,
                 email,
                 durationMs: Date.now() - startedAt,
@@ -42,7 +43,7 @@ export const authOptions: NextAuthConfig = {
               return null
             }
             if (!user.isActive) {
-              console.warn('[auth] credentials authorize: tenant user inactive', {
+              logger.warn('auth.credentials.authorize: tenant user inactive', {
                 tenantId,
                 email,
                 userId: user.id,
@@ -53,7 +54,7 @@ export const authOptions: NextAuthConfig = {
             if (user && user.isActive) {
               const ok = await bcrypt.compare(password, user.password)
               if (!ok) {
-                console.warn('[auth] credentials authorize: tenant password mismatch', {
+                logger.warn('auth.credentials.authorize: tenant password mismatch', {
                   tenantId,
                   email,
                   userId: user.id,
@@ -67,7 +68,7 @@ export const authOptions: NextAuthConfig = {
                 .update({ where: { id: user.id }, data: { lastLogin: new Date() } })
                 .catch(() => {})
 
-              console.warn('[auth] credentials authorize: tenant ok', {
+              logger.info('auth.credentials.authorize: tenant ok', {
                 tenantId,
                 email,
                 userId: user.id,
@@ -138,14 +139,14 @@ export const authOptions: NextAuthConfig = {
           // Platform login: /platform/login (master DB)
           const user = await prismaMaster.user.findUnique({ where: { email } })
           if (!user) {
-            console.warn('[auth] credentials authorize: platform user not found', {
+            logger.warn('auth.credentials.authorize: platform user not found', {
               email,
               durationMs: Date.now() - startedAt,
             })
             return null
           }
           if (!user.isActive) {
-            console.warn('[auth] credentials authorize: platform user inactive', {
+            logger.warn('auth.credentials.authorize: platform user inactive', {
               email,
               userId: user.id,
               durationMs: Date.now() - startedAt,
@@ -154,7 +155,7 @@ export const authOptions: NextAuthConfig = {
           }
           const ok = await bcrypt.compare(password, user.password)
           if (!ok) {
-            console.warn('[auth] credentials authorize: platform password mismatch', {
+            logger.warn('auth.credentials.authorize: platform password mismatch', {
               email,
               userId: user.id,
               durationMs: Date.now() - startedAt,
@@ -166,7 +167,7 @@ export const authOptions: NextAuthConfig = {
             .update({ where: { id: user.id }, data: { lastLogin: new Date() } })
             .catch(() => {})
 
-          console.warn('[auth] credentials authorize: platform ok', {
+          logger.info('auth.credentials.authorize: platform ok', {
             email,
             userId: user.id,
             role: user.role,
@@ -180,9 +181,10 @@ export const authOptions: NextAuthConfig = {
             role: user.role,
             tenantId: user.tenantId,
           }
-        } catch {
-          console.warn('[auth] credentials authorize: exception', {
+        } catch (error) {
+          logger.error('auth.credentials.authorize: exception', {
             durationMs: Date.now() - startedAt,
+            error: error instanceof Error ? error.message : String(error),
           })
           return null
         }
