@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -143,14 +143,7 @@ export default function CustomerOrderDetailsPage() {
     window.location.href = `/api/documents/generate/upd?invoiceId=${encodeURIComponent(invoiceId)}&format=${format}`
   }
 
-  useEffect(() => {
-    if (id) loadOrder()
-    loadCustomers()
-    loadProducts()
-    loadServices()
-  }, [id])
-
-  async function loadOrder() {
+  const loadOrder = useCallback(async () => {
     if (!id) return
     setLoading(true)
     setError('')
@@ -252,9 +245,9 @@ export default function CustomerOrderDetailsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [id])
 
-  async function loadCustomers() {
+  const loadCustomers = useCallback(async () => {
     try {
       const res = await fetch('/api/customers')
       if (res.ok) {
@@ -271,7 +264,7 @@ export default function CustomerOrderDetailsPage() {
     } catch {
       // Ignore
     }
-  }
+  }, [])
 
   async function quickCreateCustomer() {
     const name = newCustomerName.trim()
@@ -308,7 +301,7 @@ export default function CustomerOrderDetailsPage() {
     }
   }
 
-  async function loadProducts() {
+  const loadProducts = useCallback(async () => {
     try {
       const res = await fetch('/api/products')
       if (res.ok) {
@@ -318,9 +311,9 @@ export default function CustomerOrderDetailsPage() {
     } catch {
       // Ignore
     }
-  }
+  }, [])
 
-  async function loadServices() {
+  const loadServices = useCallback(async () => {
     try {
       const res = await fetch('/api/services')
       if (res.ok) {
@@ -330,7 +323,14 @@ export default function CustomerOrderDetailsPage() {
     } catch {
       // Ignore
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    if (id) void loadOrder()
+    void loadCustomers()
+    void loadProducts()
+    void loadServices()
+  }, [id, loadOrder, loadCustomers, loadProducts, loadServices])
 
   function openAddItem(type: 'product' | 'service') {
     setItemType(type)

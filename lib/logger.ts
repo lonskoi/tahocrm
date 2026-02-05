@@ -36,18 +36,22 @@ function emit(level: LogLevel, message: string, meta?: Record<string, unknown>) 
 
   if (level === 'error') {
     // console.error keeps stack traces in container logs.
-    out ? console.error(line, out) : console.error(line)
+    if (out) console.error(line, out)
+    else console.error(line)
     return
   }
   if (level === 'warn') {
-    out ? console.warn(line, out) : console.warn(line)
+    if (out) console.warn(line, out)
+    else console.warn(line)
     return
   }
   if (level === 'debug') {
-    out ? console.log(line, out) : console.log(line)
+    if (out) console.log(line, out)
+    else console.log(line)
     return
   }
-  out ? console.log(line, out) : console.log(line)
+  if (out) console.log(line, out)
+  else console.log(line)
 }
 
 export const logger = {

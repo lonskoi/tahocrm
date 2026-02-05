@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -109,23 +109,6 @@ export default function NewCustomerOrderPage() {
   }
   const draft = useFormDraft({ key: 'customer-order-new', enabled: true }, formData, [])
 
-  useEffect(() => {
-    loadCustomers()
-    loadProducts()
-    loadServices()
-    const draftData = draft.loadDraft()
-    if (draftData) {
-      setOrderNumber(draftData.orderNumber ?? '')
-      setDocumentDateLocal(draftData.documentDateLocal ?? documentDateLocal)
-      setCustomerId(draftData.customerId ?? '')
-      setOrderItems(draftData.orderItems ?? [])
-      setDriverCards(draftData.driverCards ?? [])
-      setIsPaid(draftData.isPaid ?? false)
-      setIsShipped(draftData.isShipped ?? false)
-      setIsDocumentsSigned(draftData.isDocumentsSigned ?? false)
-    }
-  }, [])
-
   function addDriverCardRow() {
     setDriverCards(prev => [
       ...prev,
@@ -148,7 +131,7 @@ export default function NewCustomerOrderPage() {
     setDriverCards(prev => prev.filter(r => r.id !== id))
   }
 
-  async function loadCustomers() {
+  const loadCustomers = useCallback(async () => {
     try {
       const res = await fetch('/api/customers')
       if (res.ok) {
@@ -165,7 +148,7 @@ export default function NewCustomerOrderPage() {
     } catch {
       // Ignore
     }
-  }
+  }, [])
 
   async function quickCreateCustomer() {
     const name = newCustomerName.trim()
@@ -202,7 +185,7 @@ export default function NewCustomerOrderPage() {
     }
   }
 
-  async function loadProducts() {
+  const loadProducts = useCallback(async () => {
     try {
       const res = await fetch('/api/products')
       if (res.ok) {
@@ -212,9 +195,9 @@ export default function NewCustomerOrderPage() {
     } catch {
       // Ignore
     }
-  }
+  }, [])
 
-  async function loadServices() {
+  const loadServices = useCallback(async () => {
     try {
       const res = await fetch('/api/services')
       if (res.ok) {
@@ -224,7 +207,24 @@ export default function NewCustomerOrderPage() {
     } catch {
       // Ignore
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    void loadCustomers()
+    void loadProducts()
+    void loadServices()
+    const draftData = draft.loadDraft()
+    if (draftData) {
+      setOrderNumber(draftData.orderNumber ?? '')
+      setDocumentDateLocal(prev => draftData.documentDateLocal ?? prev)
+      setCustomerId(draftData.customerId ?? '')
+      setOrderItems(draftData.orderItems ?? [])
+      setDriverCards(draftData.driverCards ?? [])
+      setIsPaid(draftData.isPaid ?? false)
+      setIsShipped(draftData.isShipped ?? false)
+      setIsDocumentsSigned(draftData.isDocumentsSigned ?? false)
+    }
+  }, [draft, loadCustomers, loadProducts, loadServices])
 
   function openAddItem(type: 'product' | 'service') {
     setItemType(type)

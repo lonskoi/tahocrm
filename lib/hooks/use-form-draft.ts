@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useCallback, useRef } from 'react'
+import { useEffect, useCallback, useMemo, useRef } from 'react'
 
 const STORAGE_PREFIX = 'form-draft-'
 
@@ -21,6 +21,14 @@ export function useFormDraft<T extends Record<string, any>>(
   const isRestoringRef = useRef(false)
 
   // Сохранение данных в localStorage с debounce
+  const depsKey = useMemo(() => {
+    try {
+      return JSON.stringify(dependencies)
+    } catch {
+      return String(dependencies.length)
+    }
+  }, [dependencies])
+
   useEffect(() => {
     if (!enabled || isRestoringRef.current) {
       isRestoringRef.current = false
@@ -44,7 +52,7 @@ export function useFormDraft<T extends Record<string, any>>(
         clearTimeout(timeoutRef.current)
       }
     }
-  }, [formData, storageKey, enabled, debounceMs, ...dependencies])
+  }, [formData, storageKey, enabled, debounceMs, depsKey])
 
   // Загрузка данных из localStorage
   const loadDraft = useCallback((): T | null => {
