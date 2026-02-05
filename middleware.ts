@@ -48,12 +48,22 @@ export async function middleware(request: NextRequest) {
       process.env.AUTH_SECRET ||
       process.env.NEXTAUTH_SECRET ||
       'development-secret-key-change-in-production'
-    const isSecure =
-      request.nextUrl.protocol === 'https:' ||
-      (process.env.NEXTAUTH_URL ?? '').startsWith('https://')
-    const cookieName = isSecure ? '__Secure-authjs.session-token' : 'authjs.session-token'
+    // Behind a reverse proxy (e.g. Caddy), Next.js may see the request as http even if
+    // the browser uses https. Also, cookies sent by the browser keep their `__Secure-`
+    // prefix. To be robust, try both cookie names.
+    const cookieNames = [
+      '__Secure-authjs.session-token',
+      'authjs.session-token',
+      // legacy fallback (just in case)
+      '__Secure-next-auth.session-token',
+      'next-auth.session-token',
+    ] as const
 
-    const token = await getToken({ req: request, secret, cookieName })
+    let token: Awaited<ReturnType<typeof getToken>> = null
+    for (const cookieName of cookieNames) {
+      token = await getToken({ req: request, secret, cookieName })
+      if (token) break
+    }
 
     if (!token) {
       if (
