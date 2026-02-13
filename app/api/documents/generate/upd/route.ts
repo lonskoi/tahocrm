@@ -12,8 +12,6 @@ import path from 'path'
 import os from 'os'
 import { mkdtemp, rm, writeFile, readFile as readFileFs } from 'fs/promises'
 import { spawn } from 'child_process'
-import { hasAnyRole } from '@/lib/authz'
-import type { UserRole } from '@prisma/client'
 
 // Ensure Node.js runtime (ExcelJS + child_process)
 export const runtime = 'nodejs'

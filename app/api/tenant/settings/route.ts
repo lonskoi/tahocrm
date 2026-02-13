@@ -7,7 +7,6 @@ import { validateRequest } from '@/lib/validation/middleware'
 import { hasRole } from '@/lib/authz'
 import { z } from 'zod'
 import type { VatRate } from '@prisma/client'
-import { hasRole } from '@/lib/authz'
 
 const updateTenantSettingsSchema = z.object({
   defaultVatRate: z.enum(['NONE', 'VAT_5', 'VAT_7', 'VAT_10', 'VAT_20', 'VAT_22']).optional(),
