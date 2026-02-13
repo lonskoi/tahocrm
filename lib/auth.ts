@@ -235,7 +235,6 @@ export const authOptions: NextAuthConfig = {
       const identityId = (user?.id as string | undefined) ?? (token.id as string | undefined)
       const identityTenantId =
         (user as { tenantId?: string | null } | undefined)?.tenantId ??
-        null ??
         (token.tenantId as string | null | undefined)
 
       if (hasSyntheticTenantIdentity(identityId, identityTenantId)) {
