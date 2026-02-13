@@ -36,7 +36,6 @@ export async function GET(request: NextRequest) {
         order: { select: { id: true, number: true, isPaid: true, createdAt: true } },
       },
     })
-
     return NextResponse.json(rows)
   } catch (error) {
     return handleApiError(error, { method: 'GET', path, userId, tenantId: tenantIdForLog })

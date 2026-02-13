@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
+import { formatDateTime, localInputToIso, pickBusinessDate } from '@/lib/datetime'
 
 type Org = {
   id: string
@@ -11,6 +12,10 @@ type Org = {
   inn: string | null
   kpp: string | null
   isDefault: boolean
+  createdAt: string
+  updatedAt: string
+  businessCreatedAt: string | null
+  businessUpdatedAt: string | null
 }
 
 type VatRate = 'NONE' | 'VAT_5' | 'VAT_7' | 'VAT_10' | 'VAT_20' | 'VAT_22'
@@ -28,6 +33,8 @@ export default function SettingsPage() {
   const [inn, setInn] = useState('')
   const [kpp, setKpp] = useState('')
   const [isDefault, setIsDefault] = useState(false)
+  const [businessCreatedAtLocal, setBusinessCreatedAtLocal] = useState('')
+  const [businessUpdatedAtLocal, setBusinessUpdatedAtLocal] = useState('')
 
   async function load() {
     setLoading(true)
@@ -69,6 +76,8 @@ export default function SettingsPage() {
     setInn('')
     setKpp('')
     setIsDefault(false)
+    setBusinessCreatedAtLocal('')
+    setBusinessUpdatedAtLocal('')
     setIsModalOpen(true)
   }
 
@@ -84,6 +93,8 @@ export default function SettingsPage() {
           inn: inn || null,
           kpp: kpp || null,
           isDefault,
+          businessCreatedAt: localInputToIso(businessCreatedAtLocal),
+          businessUpdatedAt: localInputToIso(businessUpdatedAtLocal),
         }),
       })
       const data = await res.json()
@@ -164,6 +175,7 @@ export default function SettingsPage() {
               <th className="px-4 py-3 text-left">ИНН</th>
               <th className="px-4 py-3 text-left">КПП</th>
               <th className="px-4 py-3 text-left">По умолчанию</th>
+              <th className="px-4 py-3 text-left">Дата/время</th>
             </tr>
           </thead>
           <tbody>
@@ -173,11 +185,19 @@ export default function SettingsPage() {
                 <td className="px-4 py-3 text-gray-700">{o.inn ?? '—'}</td>
                 <td className="px-4 py-3 text-gray-700">{o.kpp ?? '—'}</td>
                 <td className="px-4 py-3 text-gray-700">{o.isDefault ? 'Да' : 'Нет'}</td>
+                <td className="px-4 py-3 text-xs text-gray-600">
+                  <div>
+                    Создано: {formatDateTime(pickBusinessDate(o.businessCreatedAt, o.createdAt))}
+                  </div>
+                  <div>
+                    Обновлено: {formatDateTime(pickBusinessDate(o.businessUpdatedAt, o.updatedAt))}
+                  </div>
+                </td>
               </tr>
             ))}
             {orgs.length === 0 ? (
               <tr>
-                <td className="px-4 py-6 text-center text-gray-500" colSpan={4}>
+                <td className="px-4 py-6 text-center text-gray-500" colSpan={5}>
                   {loading ? 'Загрузка...' : 'Организаций пока нет'}
                 </td>
               </tr>
@@ -276,6 +296,20 @@ export default function SettingsPage() {
             />
             <span className="text-sm text-gray-800">Сделать организацией по умолчанию</span>
           </label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Input
+              label="Дата/время создания (бизнес)"
+              type="datetime-local"
+              value={businessCreatedAtLocal}
+              onChange={e => setBusinessCreatedAtLocal(e.target.value)}
+            />
+            <Input
+              label="Дата/время изменения (бизнес)"
+              type="datetime-local"
+              value={businessUpdatedAtLocal}
+              onChange={e => setBusinessUpdatedAtLocal(e.target.value)}
+            />
+          </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="ghost" onClick={() => setIsModalOpen(false)} disabled={loading}>
               Отмена

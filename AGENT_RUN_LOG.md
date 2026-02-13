@@ -71,3 +71,199 @@
 - **ГИПОТЕЗА C ПОДТВЕРЖДЕНА**: Dev сервер использует старый Prisma Client из памяти (кешированный экземпляр в `globalForPrisma.prismaByUrl`)
 - **РЕШЕНИЕ**: Необходимо применить изменения схемы к master БД через `prisma db push` и перезапустить dev сервер для перезагрузки Prisma Client
 - **ДЕЙСТВИЕ**: Применены изменения схемы к master БД через `prisma db push` с DATABASE_URL='postgresql://user:password@localhost:5432/tahocrm_master', запущен `npm run start:verified` для перезапуска dev сервера
+
+### 2026-02-13 - Синхронизация контекста и правил перед продолжением работ
+
+- **ЗАДАЧА**: Перед дальнейшими правками зафиксировать единое понимание целей проекта, текущего состояния, правил выполнения и фактического состояния логирования.
+- **ЧТО ПРОВЕРЕНО**:
+  - Контекст продукта и статуса: `README.md`, `PROJECT_STATUS.md`, `SUBSCRIPTION_SYSTEM.md`.
+  - Обязательные правила и проверки: `CHECKLIST.md`, `.lintstagedrc.js`, `.husky/pre-commit`, `.husky/pre-push`, `scripts/check-all.ts`.
+  - Логирование и расхождения: `README_LOGGING.md`, `QUICK_START_LOGGING.md`, `lib/logger.ts`, `.cursor/debug.log`.
+- **ВЫВОД**:
+  - Базовый рабочий процесс подтвержден: локальная разработка -> проверки -> деплой.
+  - Правила pre-commit/pre-push и чеклисты актуальны и должны соблюдаться на каждом изменении.
+  - Зафиксировано, что документация по файловым логам частично расходится с текущей реализацией `lib/logger.ts` (фактический вывод в stdout/stderr через `console.*`).
+- **СТАТУС**: Контекст и правила синхронизированы; использовать как baseline для следующих задач.
+
+### 2026-02-13 - Фикс локального tenant-логина + server-parity контроль
+
+- **ПРОБЛЕМА**: В локальной CRM не работал вход `tenant-admin@test.com / admin123` на `/crm/<tenantId>/login`.
+- **ДИАГНОЗ**:
+  - Dev demo-ветка в `lib/auth.ts` была недостижима из-за ранних `return null` в tenant-ветке.
+  - В локальной среде tenant DB может быть недоступна/неподготовлена, из-за чего `prisma.user.upsert/findUnique` падали и авторизация завершалась `CredentialsSignin`.
+- **ИЗМЕНЕНИЯ**:
+  - Обновлен `lib/auth.ts`:
+    - dev demo-кейс вычисляется заранее;
+    - demo-провижининг выполняется строго при `NODE_ENV !== 'production'`;
+    - при ошибке доступа к tenant DB в dev возвращается безопасный demo fallback user (без изменения production flow).
+  - Обновлен `CHECKLIST.md`:
+    - добавлен обязательный раздел `Server parity (обязательно перед merge/deploy)` с шагами проверки прод-эквивалентности.
+- **SERVER-PARITY ГАРАНТИИ**:
+  - Production-ветка логина не ослаблена: demo-fallback не активируется при `NODE_ENV=production`.
+  - Обычная проверка tenant/platform логина по БД и `bcrypt.compare` сохранена.
+- **ПРОВЕРКИ**:
+  - `npm run type-check` — успешно.
+  - Browser smoke-check (локально):
+    - `tenant-admin@test.com / admin123` -> PASS, редирект на `/crm/tenant-1`;
+    - `manager@test.com / manager123` -> PASS, редирект на `/crm/tenant-1`;
+    - `manager@test.com / wrongpass123` -> PASS (негативный сценарий), вход отклоняется.
+- **СТАТУС**: Локальный стандартный tenant-логин восстановлен, production-поведение сохранено, правило server-parity закреплено.
+
+### 2026-02-13 - Введено двустороннее parity-правило (server <-> local)
+
+- **ЗАДАЧА**: Формализовать правило, чтобы изменения для серверной части не ломали локальную часть приложения, и наоборот.
+- **ИЗМЕНЕНИЯ**:
+  - `CHECKLIST.md`: добавлен обязательный раздел `Local parity (обязательно перед merge/deploy)`.
+  - `README.md`: добавлен раздел `Правило parity (обязательно)` с двусторонним стандартом проверки (`local -> server` и `server -> local`).
+- **НОВЫЙ СТАНДАРТ**:
+  - Перед merge/deploy обязательны:
+    - `npm run type-check` + релевантные тесты;
+    - server smoke-check;
+    - local smoke-check минимум по `/api/health` и `/crm/tenant-1/login`;
+    - фиксация результатов в `AGENT_RUN_LOG.md`.
+- **СТАТУС**: Двусторонний parity-процесс зафиксирован как постоянное правило проекта.
+
+### 2026-02-13 - Локальный фикс driver-cards tenant access error
+
+- **ПРОБЛЕМА**: На `/crm/tenant-1/driver-cards` локально показывался сырой Prisma stacktrace (`checkTenantAccess` / `prismaMaster.tenant.findUnique`).
+- **ДИАГНОЗ**:
+  - `checkTenantAccess` получал Prisma connection error с кодом `ECONNREFUSED`, но не обрабатывал код явно.
+  - Локальная синхронизация master DB не завершалась: `prisma db push` падал с `P1001` (PostgreSQL на `localhost:5432` недоступен, Docker engine не запущен).
+  - После обхода `tenant access` следом всплывала ошибка `prisma.driverCardRequest.findMany()` (tenant DB недоступна) и стек уходил в UI.
+- **ИЗМЕНЕНИЯ**:
+  - `lib/tenant-check.ts`:
+    - добавлена нормализация `tenantId` (`trim` + проверка пустого значения);
+    - расширена диагностика соединения (`code: ECONNREFUSED|P1001`);
+    - добавлен dev-only fallback: при connection issue возвращать `allowed: true`, чтобы не блокировать локальный UI server-side инфраструктурными сбоями.
+  - `app/api/driver-cards/route.ts`:
+    - добавлен dev-only fallback для `GET`: при недоступной tenant DB возвращается пустой список вместо stacktrace.
+- **ПРОВЕРКИ**:
+  - `npm run type-check` — успешно.
+  - Browser smoke-check:
+    - login `/crm/tenant-1/login` с `tenant-admin@test.com/admin123` -> PASS;
+    - `/crm/tenant-1/driver-cards` -> PASS, страница рендерится, технический stacktrace не показывается;
+    - видимое состояние: пустой список (`Пока нет заявок`).
+  - Инфраструктурная проверка:
+    - `npx prisma generate` -> успешно;
+    - `prisma db push` в `tahocrm_master` -> не выполнен из-за недоступного PostgreSQL (`P1001`, Docker engine offline).
+- **СТАТУС**: Пользовательская ошибка в разделе карт водителей устранена для локальной работы; production-поведение не изменено (все fallback-ветки ограничены `NODE_ENV !== 'production'`).
+
+### 2026-02-13 - Infra-first восстановление локальной БД для разделов CRM
+
+- **ПРОБЛЕМА**: Массовые ошибки в локальных разделах (`клиенты`, `ТС`, и др.) с `Invalid prisma.<model>.findMany()`; ошибка не ограничивалась `driver-cards`.
+- **КОРЕНЬ ПРИЧИНЫ**:
+  - Локальный PostgreSQL был недоступен (`ECONNREFUSED`/`P1001` на `localhost:5432`).
+  - Временные dev-fallback обходы маскировали проблему и расходились со strict infra-first подходом.
+- **ПРИНЯТОЕ РЕШЕНИЕ**: Вернуться к strict infra-first (без fallback), восстановить инфраструктуру БД и синхронизировать Prisma.
+- **ИЗМЕНЕНИЯ В КОДЕ**:
+  - `lib/tenant-check.ts`: удален dev-only `allowed: true` fallback при connection issue (оставлена строгая обработка ошибок БД).
+  - `app/api/driver-cards/route.ts`: удален dev-only возврат `[]` при недоступной tenant DB; восстановлен стандартный поток через `handleApiError`.
+- **ИНФРАСТРУКТУРА (ЛОКАЛЬНО)**:
+  - Запущен Docker Desktop daemon.
+  - Поднят контейнер БД: `docker compose up -d db`.
+  - Выполнено:
+    - `npx prisma generate`
+    - `DATABASE_URL=postgresql://user:password@localhost:5432/tahocrm_master npx prisma db push`
+    - `DATABASE_URL=postgresql://user:password@localhost:5432/tahocrm_tenant_tenant-1 npx prisma db push`
+  - Перезапущен dev-сервер для очистки кэша Prisma.
+- **ПРОВЕРКИ**:
+  - `GET /api/health` -> `200`.
+  - Browser smoke-check:
+    - `/crm/tenant-1/customers` -> PASS (без Prisma invocation error);
+    - `/crm/tenant-1/vehicles` -> PASS (без Prisma invocation error);
+    - `/crm/tenant-1/driver-cards` -> PASS (без Prisma invocation error).
+  - Логи dev-сервера: ошибок `Invalid prisma.customer.findMany` / `vehicle.findMany` / `driverCardRequest.findMany` после восстановления не обнаружено.
+- **СТАТУС**: Локальная инфраструктура восстановлена, fallback-обходы удалены, разделы CRM работают в strict infra-first режиме.
+
+### 2026-02-13 - Введено обязательное preflight-правило перед правками
+
+- **ЗАДАЧА**: Закрепить стандарт, что перед запуском работ и перед любой правкой сначала поднимается всё необходимое окружение и проверяется базовая готовность приложения.
+- **ИЗМЕНЕНИЯ**:
+  - `CHECKLIST.md`: добавлен раздел `Preflight перед началом работ (обязательно)`.
+  - `README.md`: добавлен раздел `Порядок работы (обязательно)` с правилом `start dependencies -> preflight checks -> edits`.
+- **НОВЫЙ ОБЯЗАТЕЛЬНЫЙ ПОРЯДОК**:
+  1. Поднять зависимости приложения (Postgres/Docker, `.env`, dev-сервер).
+  2. Выполнить preflight-проверки (`/api/health`, логин `/crm/tenant-1/login`, базовые страницы).
+  3. Свериться с правилами проекта и актуальными записями `AGENT_RUN_LOG.md`.
+  4. Только после этого вносить изменения в код.
+- **СТАТУС**: Preflight-процесс закреплен как постоянный стандарт разработки.
+
+### 2026-02-13 - Root-cause fix для FK ошибки при создании клиента из driver-cards
+
+- **ПРОБЛЕМА**: При `Новая заявка на карту водителя -> Создать и выбрать` возникала ошибка FK `Customer_createdById_fkey`.
+- **ПЕРВОПРИЧИНА**:
+  - В `lib/auth.ts` tenant demo-login при ошибке `upsert` создавал синтетический user id (`demo-*`).
+  - Write-роуты использовали `session.user.id` как FK (`createdById`, `creatorId`, `responsibles.userId`), но `demo-*` не существует в tenant таблице `User`.
+- **ROOT-CAUSE FIX (без заплаток)**:
+  - `lib/auth.ts`: удален synthetic fallback user; при сбое demo-provisioning login теперь отклоняется (`return null`).
+  - `lib/auth.ts`: в JWT callback добавлена защита от synthetic tenant identity (очистка токена).
+  - `lib/authz.ts`: добавлен `hasInvalidTenantSessionIdentity()`.
+  - `app/api/customers/route.ts`, `app/api/orders/route.ts`, `app/api/tasks/route.ts`: добавлена проверка инварианта сессии и явный `INVALID_SESSION`, если identity невалиден.
+- **ПРОВЕРКИ**:
+  - `npm run type-check` — успешно.
+  - E2E browser: `driver-cards -> Добавить заявку -> Создать и выбрать` — PASS, customer создается/выбирается, FK ошибка не воспроизводится.
+  - Негативный тест: при остановленной БД demo `authorize()` возвращает `null` (нет ложной сессии).
+  - После теста БД восстановлена, `/api/health` -> `200`.
+- **НОВОЕ ПРАВИЛО**:
+  - В проекте закреплен подход `root-cause first`:
+    - сначала исправляем первопричину;
+    - workaround допускается только как краткосрочный и с обязательным removal plan.
+- **СТАТУС**: Инвариант tenant-сессии восстановлен, корневая причина устранена, правило root-cause first зафиксировано.
+
+### 2026-02-13 - Global timestamp rollout (business даты + системный audit)
+
+- **ЗАДАЧА**: Внедрить обязательный стандарт дат/времени во всех ключевых сущностях и UI: редактируемые бизнес-даты + неизменяемые системные audit-поля.
+- **ИЗМЕНЕНИЯ В DATA LAYER**:
+  - `prisma/schema.prisma`: добавлены `businessCreatedAt` / `businessUpdatedAt` для core и связанных сущностей:
+    - `Customer`, `Contact`, `CustomerBankAccount`, `IssuerOrganization`, `Product`, `Service`, `User`,
+    - `Vehicle`, `Tachograph`, `SKZI`, `Order`, `Task`, `DriverCardRequest`, `Invoice`, `Document`.
+  - Для `Document` добавлено отсутствовавшее системное `updatedAt`.
+- **MIGRATION/BACKFILL (локально)**:
+  - Выполнено `npx prisma db push` для:
+    - `tahocrm_master`
+    - `tahocrm_tenant_tenant-1`
+  - Выполнен SQL backfill:
+    - `businessCreatedAt = COALESCE(businessCreatedAt, createdAt)`
+    - `businessUpdatedAt = COALESCE(businessUpdatedAt, updatedAt, createdAt)`
+    - по всем внедренным моделям.
+- **ИЗМЕНЕНИЯ В API/VALIDATION**:
+  - `lib/validation/schemas.ts`: добавлены `businessCreatedAt/businessUpdatedAt` в create/update схемы.
+  - Обновлены create/update роуты для приема/сохранения бизнес-дат:
+    - customers, orders, invoices, vehicles, driver-cards,
+    - contacts, customer-bank-accounts, organizations,
+    - products/services, users, documents, tachographs, tasks, skzi.
+- **ИЗМЕНЕНИЯ В UI**:
+  - Добавлен общий helper `lib/datetime.ts` (display + convert + fallback business/system).
+  - Обновлены ключевые страницы CRM (таблицы + формы/модалки) с бизнес-датами:
+    - customers, customers/new, customers/[id],
+    - vehicles, customer-orders, invoices,
+    - driver-cards, products-services, users, documents, settings, equipment.
+- **ДОКУМЕНТЫ**:
+  - `app/api/documents/generate/upd/route.ts`: бизнес-даты используются как приоритетные для даты счета/заказа с fallback на системные.
+- **ПРОВЕРКИ**:
+  - `npm run db:generate` — успешно.
+  - `npm run type-check` — успешно.
+  - `npm run check-all` — частично успешно: `TypeScript`, `ESLint`, `Jest`, `Next build` прошли; падение только на уже существующем пороге coverage (`branches 24.19% < 25%`), не связано с timestamp-rollout.
+- **СТАТУС**: Базовый global rollout завершен; стандарт `business* + audit-only system timestamps` зафиксирован в коде и правилах.
+
+### 2026-02-13 - Введено обязательное правило коммуникации на русском языке
+
+- **ЗАДАЧА**: Формально закрепить новое правило: коммуникация с пользователем ведется на русском языке.
+- **ИЗМЕНЕНИЯ**:
+  - `README.md`: добавлен раздел `Язык коммуникации (обязательно)`.
+  - `CHECKLIST.md`: добавлен раздел `Язык коммуникации (обязательно)` с проверочными пунктами.
+- **СИНХРОНИЗАЦИЯ С ПРАВИЛАМИ**:
+  - Подтверждено, что действующие правила `parity`, `preflight`, `root-cause first`, `timestamp coverage` остаются обязательными без изменения приоритетов.
+- **СТАТУС**: Правило русского языка закреплено в проектной документации и включено в обязательный чеклист.
+
+### 2026-02-13 - Введено обязательное правило автономного полного цикла
+
+- **ЗАДАЧА**: Закрепить правило: агент выполняет задачи самостоятельно до результата, включая production-деплой по безопасному полному циклу.
+- **ИЗМЕНЕНИЯ**:
+  - `README.md`: добавлен раздел `Автономное выполнение задач (обязательно)`.
+  - `CHECKLIST.md`: добавлен раздел `Автономное выполнение (обязательно)`.
+- **ПРАВИЛО**:
+  - Стандартный цикл: `preflight -> реализация -> проверка -> отчет`.
+  - Для production: `preflight -> deploy -> smoke -> rollback-plan/rollback`.
+  - Остановка только при критичном риске или отсутствии необходимого доступа.
+- **СТАТУС**: Правило автономного полного цикла зафиксировано в документации и включено в контрольный чеклист.

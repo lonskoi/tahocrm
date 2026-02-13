@@ -5,16 +5,18 @@ import { checkTenantAccess } from '@/lib/tenant-check'
 import { handleApiError, ApiError } from '@/lib/api-error-handler'
 import { validateRequest } from '@/lib/validation/middleware'
 import { updateCustomerBankAccountSchema } from '@/lib/validation/schemas'
+import { hasAnyRole } from '@/lib/authz'
+import type { UserRole } from '@prisma/client'
 
-const WRITE_ROLES = new Set(['TENANT_ADMIN', 'DIRECTOR', 'MANAGER'])
+const WRITE_ROLES = new Set<UserRole>(['TENANT_ADMIN', 'DIRECTOR', 'MANAGER'])
 
 async function canEditCustomer(
   prisma: ReturnType<typeof prismaTenant>,
   tenantId: string,
   customerId: string,
-  user: { id: string; role: string }
+  user: { id: string; role: UserRole; roles?: UserRole[] | null }
 ) {
-  if (WRITE_ROLES.has(user.role)) return true
+  if (hasAnyRole(user, WRITE_ROLES)) return true
   const customer = await prisma.customer.findFirst({
     where: { id: customerId, tenantId },
     select: {
@@ -60,6 +62,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     const allowed = await canEditCustomer(prisma, tenantId, existing.customerId, {
       id: session.user.id,
       role: session.user.role,
+      roles: session.user.roles ?? [],
     })
     if (!allowed) throw new ApiError(403, 'Forbidden', 'FORBIDDEN')
 
@@ -72,6 +75,12 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         ...(data.corrAccount !== undefined ? { corrAccount: data.corrAccount } : {}),
         ...(data.accountNumber !== undefined ? { accountNumber: data.accountNumber } : {}),
         ...(data.comment !== undefined ? { comment: data.comment } : {}),
+        ...(data.businessCreatedAt !== undefined
+          ? { businessCreatedAt: data.businessCreatedAt ? new Date(data.businessCreatedAt) : null }
+          : {}),
+        ...(data.businessUpdatedAt !== undefined
+          ? { businessUpdatedAt: data.businessUpdatedAt ? new Date(data.businessUpdatedAt) : null }
+          : {}),
       },
     })
 
@@ -110,6 +119,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
     const allowed = await canEditCustomer(prisma, tenantId, existing.customerId, {
       id: session.user.id,
       role: session.user.role,
+      roles: session.user.roles ?? [],
     })
     if (!allowed) throw new ApiError(403, 'Forbidden', 'FORBIDDEN')
 

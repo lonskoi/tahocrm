@@ -49,6 +49,11 @@ const optionalDatetime = z
   .optional()
   .nullable()
 
+const businessTimestampsShape = {
+  businessCreatedAt: optionalDatetime,
+  businessUpdatedAt: optionalDatetime,
+}
+
 /**
  * Схемы для аутентификации
  */
@@ -78,6 +83,7 @@ export const createTaskSchema = z.object({
   orderId: optionalCuid,
   customerId: optionalCuid,
   dueDate: optionalDatetime,
+  ...businessTimestampsShape,
 })
 
 export type CreateTaskInput = z.infer<typeof createTaskSchema>
@@ -129,6 +135,7 @@ export const createOrderSchema = z.object({
   description: optionalText(5000),
   comment: optionalText(5000),
   totalAmount: z.number().nonnegative('Сумма не может быть отрицательной').optional(),
+  ...businessTimestampsShape,
 })
 
 export type CreateOrderInput = z.infer<typeof createOrderSchema>
@@ -159,6 +166,7 @@ export const createVehicleSchema = z.object({
   mileage: z.number().int().nonnegative().optional().nullable(),
   tireSize: optionalText(200),
   notes: optionalText(5000),
+  ...businessTimestampsShape,
 })
 
 export type CreateVehicleInput = z.infer<typeof createVehicleSchema>
@@ -195,6 +203,7 @@ export const createTachographSchema = z.object({
     })
     .nullable(),
   tireSize: optionalText(200),
+  ...businessTimestampsShape,
 })
 
 export type CreateTachographInput = z.infer<typeof createTachographSchema>
@@ -211,6 +220,7 @@ export const createSKZISchema = z.object({
   expiryDate: optionalDatetime,
   mchd: optionalText(200),
   isActive: z.boolean().optional(),
+  ...businessTimestampsShape,
 })
 
 export type CreateSKZIInput = z.infer<typeof createSKZISchema>
@@ -278,6 +288,7 @@ export const createUserSchema = z.object({
   roles: z.array(userRoleSchema).optional(),
   tenantId: cuidSchema.optional().nullable(),
   isActive: z.boolean().optional(),
+  ...businessTimestampsShape,
 })
 
 export type CreateUserInput = z.infer<typeof createUserSchema>
@@ -291,6 +302,7 @@ export const updateUserSchema = z
     role: userRoleSchema.optional(),
     roles: z.array(userRoleSchema).optional(),
     isActive: z.boolean().optional(),
+    ...businessTimestampsShape,
   })
   .partial()
 
@@ -319,6 +331,7 @@ export const createCustomerSchema = z.object({
   phone: optionalText(50),
   email: optionalEmail,
   comment: optionalText(5000),
+  ...businessTimestampsShape,
 })
 
 export type CreateCustomerInput = z.infer<typeof createCustomerSchema>
@@ -333,6 +346,7 @@ export const createContactSchema = z.object({
   phone: optionalText(50),
   email: optionalEmail,
   comment: optionalText(5000),
+  ...businessTimestampsShape,
 })
 export type CreateContactInput = z.infer<typeof createContactSchema>
 
@@ -347,6 +361,7 @@ export const createCustomerBankAccountSchema = z.object({
   corrAccount: optionalText(100),
   accountNumber: optionalText(100),
   comment: optionalText(5000),
+  ...businessTimestampsShape,
 })
 export type CreateCustomerBankAccountInput = z.infer<typeof createCustomerBankAccountSchema>
 
@@ -378,6 +393,7 @@ export const driverCardRequestSchema = z.object({
   expiryDate: optionalDatetime,
   cardNumber: optionalText(100),
   pinPackCodes: z.any().optional().nullable(),
+  ...businessTimestampsShape,
 })
 
 export type DriverCardRequestInput = z.infer<typeof driverCardRequestSchema>
@@ -440,6 +456,7 @@ export const createInvoiceSchema = z.object({
   isPaid: z.boolean().optional(),
   isShipped: z.boolean().optional(),
   isDocumentsSigned: z.boolean().optional(),
+  ...businessTimestampsShape,
 })
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>
 
@@ -463,6 +480,7 @@ export const createIssuerOrganizationSchema = z.object({
   bankAccount: optionalText(50),
   bankCorr: optionalText(50),
   isDefault: z.boolean().optional(),
+  ...businessTimestampsShape,
 })
 export type CreateIssuerOrganizationInput = z.infer<typeof createIssuerOrganizationSchema>
 
@@ -490,6 +508,7 @@ export const createDocumentSchema = z.object({
   invoiceId: optionalCuid,
   vehicleId: optionalCuid,
   tachographId: optionalCuid,
+  ...businessTimestampsShape,
 })
 export type CreateDocumentInput = z.infer<typeof createDocumentSchema>
 
@@ -519,6 +538,7 @@ export const createCatalogItemSchema = z.object({
   price: z.number().nonnegative().optional(),
   vatRate: vatRateSchema.optional(),
   isActive: z.boolean().optional(),
+  ...businessTimestampsShape,
 })
 export type CreateCatalogItemInput = z.infer<typeof createCatalogItemSchema>
 

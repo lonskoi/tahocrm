@@ -44,6 +44,8 @@ export async function GET(request: NextRequest) {
         isActive: true,
         createdAt: true,
         updatedAt: true,
+        businessCreatedAt: true,
+        businessUpdatedAt: true,
         lastLogin: true,
       },
       orderBy: { createdAt: 'desc' },
@@ -86,7 +88,17 @@ export async function POST(request: NextRequest) {
 
     const validation = await validateRequest(request, createUserSchema)
     if (validation.error) return validation.error
-    const { email, password, name, phone, role, roles, isActive } = validation.data
+    const {
+      email,
+      password,
+      name,
+      phone,
+      role,
+      roles,
+      isActive,
+      businessCreatedAt,
+      businessUpdatedAt,
+    } = validation.data
 
     if (role === 'SUPER_ADMIN') {
       throw new ApiError(400, 'Invalid role', 'INVALID_ROLE')
@@ -112,6 +124,8 @@ export async function POST(request: NextRequest) {
         roles: extraRoles,
         tenantId,
         isActive: isActive ?? true,
+        businessCreatedAt: businessCreatedAt ? new Date(businessCreatedAt) : null,
+        businessUpdatedAt: businessUpdatedAt ? new Date(businessUpdatedAt) : null,
       },
       select: {
         id: true,
@@ -124,6 +138,8 @@ export async function POST(request: NextRequest) {
         isActive: true,
         createdAt: true,
         updatedAt: true,
+        businessCreatedAt: true,
+        businessUpdatedAt: true,
         lastLogin: true,
       },
     })

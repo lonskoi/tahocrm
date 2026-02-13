@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
+import { formatDateTime, localInputToIso, pickBusinessDate } from '@/lib/datetime'
 
 type DriverCardRow = {
   id: string
@@ -18,6 +19,9 @@ type DriverCardRow = {
   cardNumber: string | null
   pinPackCodes: any | null
   createdAt: string
+  updatedAt: string
+  businessCreatedAt: string | null
+  businessUpdatedAt: string | null
   customer: { id: string; name: string }
   order: { id: string; number: string; isPaid: boolean; createdAt: string }
 }
@@ -69,6 +73,8 @@ export default function DriverCardsRegistryPage() {
   const [formCardNumber, setFormCardNumber] = useState('')
   const [formPin1, setFormPin1] = useState('')
   const [formPin2, setFormPin2] = useState('')
+  const [businessCreatedAtLocal, setBusinessCreatedAtLocal] = useState('')
+  const [businessUpdatedAtLocal, setBusinessUpdatedAtLocal] = useState('')
 
   const reveal = (id: string) => setRevealed(prev => ({ ...prev, [id]: !prev[id] }))
 
@@ -151,6 +157,8 @@ export default function DriverCardsRegistryPage() {
     setFormCardNumber('')
     setFormPin1('')
     setFormPin2('')
+    setBusinessCreatedAtLocal('')
+    setBusinessUpdatedAtLocal('')
     void loadCustomers()
   }
 
@@ -218,6 +226,8 @@ export default function DriverCardsRegistryPage() {
             expiryDate: toIsoOrNull(formExpiryDateLocal),
             cardNumber: formCardNumber.trim() || null,
             pinPackCodes,
+            businessCreatedAt: localInputToIso(businessCreatedAtLocal),
+            businessUpdatedAt: localInputToIso(businessUpdatedAtLocal),
           },
         ],
       }
@@ -287,6 +297,7 @@ export default function DriverCardsRegistryPage() {
                 <th className="px-4 py-3 text-left">Клиент</th>
                 <th className="px-4 py-3 text-left">Заказ</th>
                 <th className="px-4 py-3 text-left">Оплата</th>
+                <th className="px-4 py-3 text-left">Дата/время</th>
               </tr>
             </thead>
             <tbody>
@@ -341,6 +352,15 @@ export default function DriverCardsRegistryPage() {
                     <span className={r.order.isPaid ? 'text-green-700' : 'text-orange-700'}>
                       {r.order.isPaid ? 'Оплачен' : 'Не оплачен'}
                     </span>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-gray-600">
+                    <div>
+                      Создано: {formatDateTime(pickBusinessDate(r.businessCreatedAt, r.createdAt))}
+                    </div>
+                    <div>
+                      Обновлено:{' '}
+                      {formatDateTime(pickBusinessDate(r.businessUpdatedAt, r.updatedAt))}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -493,6 +513,20 @@ export default function DriverCardsRegistryPage() {
                 type="datetime-local"
                 value={formExpiryDateLocal}
                 onChange={e => setFormExpiryDateLocal(e.target.value)}
+              />
+            </div>
+            <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Input
+                label="Дата/время создания (бизнес)"
+                type="datetime-local"
+                value={businessCreatedAtLocal}
+                onChange={e => setBusinessCreatedAtLocal(e.target.value)}
+              />
+              <Input
+                label="Дата/время изменения (бизнес)"
+                type="datetime-local"
+                value={businessUpdatedAtLocal}
+                onChange={e => setBusinessUpdatedAtLocal(e.target.value)}
               />
             </div>
 

@@ -130,6 +130,8 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
                   ? new Date(new Date(workDate).setMonth(new Date(workDate).getMonth() + 35))
                   : null,
                 isActive: true,
+                businessCreatedAt: workDate,
+                businessUpdatedAt: workDate,
               },
             })
             finalSkziId = newSkzi.id
@@ -166,6 +168,12 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
             }
           : {}),
         ...(data.tireSize !== undefined ? { tireSize: data.tireSize } : {}),
+        ...(data.businessCreatedAt !== undefined
+          ? { businessCreatedAt: data.businessCreatedAt ? new Date(data.businessCreatedAt) : null }
+          : {}),
+        ...(data.businessUpdatedAt !== undefined
+          ? { businessUpdatedAt: data.businessUpdatedAt ? new Date(data.businessUpdatedAt) : null }
+          : {}),
       },
     })
 

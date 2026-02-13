@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Modal } from '@/components/ui/modal'
 import { useFormDraft } from '@/lib/hooks/use-form-draft'
+import { formatDateTime, isoToLocalInput, localInputToIso, pickBusinessDate } from '@/lib/datetime'
 
 type EquipmentType = 'TACHOGRAPH' | 'GLONASS' | 'OTHER'
 
@@ -23,6 +24,10 @@ type Tachograph = {
   l: string | null
   workDate: string | null
   tireSize: string | null
+  createdAt: string
+  updatedAt: string
+  businessCreatedAt: string | null
+  businessUpdatedAt: string | null
   vehicle: { id: string; govNumber: string } | null
   customer: { id: string; name: string } | null
   skzi: { id: string; serialNumber: string | null; expiryDate: string | null } | null
@@ -81,6 +86,8 @@ export default function EquipmentPage() {
   const [equipmentL, setEquipmentL] = useState('')
   const [equipmentWorkDate, setEquipmentWorkDate] = useState('')
   const [equipmentTireSize, setEquipmentTireSize] = useState('')
+  const [businessCreatedAtLocal, setBusinessCreatedAtLocal] = useState('')
+  const [businessUpdatedAtLocal, setBusinessUpdatedAtLocal] = useState('')
   const [customers, setCustomers] = useState<Array<{ id: string; name: string }>>([])
   const [skziBlocks, setSkziBlocks] = useState<
     Array<{ id: string; serialNumber: string | null; expiryDate: string | null }>
@@ -100,6 +107,8 @@ export default function EquipmentPage() {
     l: equipmentL,
     workDate: equipmentWorkDate,
     tireSize: equipmentTireSize,
+    businessCreatedAtLocal,
+    businessUpdatedAtLocal,
   }
   const equipmentDraft = useFormDraft(
     { key: `equipment-edit-${editingEquipment?.id || 'new'}`, enabled: isEditModalOpen },
@@ -170,6 +179,12 @@ export default function EquipmentPage() {
             : '')
       )
       setEquipmentTireSize(draft.tireSize ?? equipment.tireSize ?? '')
+      setBusinessCreatedAtLocal(
+        draft.businessCreatedAtLocal ?? isoToLocalInput(equipment.businessCreatedAt)
+      )
+      setBusinessUpdatedAtLocal(
+        draft.businessUpdatedAtLocal ?? isoToLocalInput(equipment.businessUpdatedAt)
+      )
     } else {
       setEquipmentType(equipment.type)
       setEquipmentBrand(equipment.brand ?? '')
@@ -185,6 +200,8 @@ export default function EquipmentPage() {
         equipment.workDate ? (new Date(equipment.workDate).toISOString().split('T')[0] ?? '') : ''
       )
       setEquipmentTireSize(equipment.tireSize ?? '')
+      setBusinessCreatedAtLocal(isoToLocalInput(equipment.businessCreatedAt))
+      setBusinessUpdatedAtLocal(isoToLocalInput(equipment.businessUpdatedAt))
     }
     loadCustomers()
     loadSkziBlocks()
@@ -231,6 +248,8 @@ export default function EquipmentPage() {
         l: equipmentL || null,
         workDate: equipmentWorkDate || null,
         tireSize: equipmentTireSize || null,
+        businessCreatedAt: localInputToIso(businessCreatedAtLocal),
+        businessUpdatedAt: localInputToIso(businessUpdatedAtLocal),
       }
 
       if (skziIdToSend !== undefined) {
@@ -419,6 +438,13 @@ export default function EquipmentPage() {
                         {t.comment}
                       </div>
                     ) : null}
+                    <div className="text-xs text-gray-500 mt-1">
+                      Создано: {formatDateTime(pickBusinessDate(t.businessCreatedAt, t.createdAt))}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Обновлено:{' '}
+                      {formatDateTime(pickBusinessDate(t.businessUpdatedAt, t.updatedAt))}
+                    </div>
                   </div>
                   <div className="flex gap-2 ml-4">
                     <Button
@@ -598,6 +624,20 @@ export default function EquipmentPage() {
             onChange={e => setEquipmentComment(e.target.value)}
             rows={4}
           />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Input
+              label="Дата/время создания (бизнес)"
+              type="datetime-local"
+              value={businessCreatedAtLocal}
+              onChange={e => setBusinessCreatedAtLocal(e.target.value)}
+            />
+            <Input
+              label="Дата/время изменения (бизнес)"
+              type="datetime-local"
+              value={businessUpdatedAtLocal}
+              onChange={e => setBusinessUpdatedAtLocal(e.target.value)}
+            />
+          </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="ghost" onClick={() => setIsEditModalOpen(false)} disabled={loading}>
               Отмена

@@ -136,6 +136,8 @@ export async function POST(request: NextRequest) {
           isPaid: data.isPaid ?? false,
           isShipped: data.isShipped ?? false,
           isDocumentsSigned: data.isDocumentsSigned ?? false,
+          businessCreatedAt: data.businessCreatedAt ? new Date(data.businessCreatedAt) : null,
+          businessUpdatedAt: data.businessUpdatedAt ? new Date(data.businessUpdatedAt) : null,
         } as any,
       })
 

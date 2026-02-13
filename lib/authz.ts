@@ -1,8 +1,10 @@
 import type { UserRole } from '@prisma/client'
 
 type UserLike = {
+  id?: string | null
   role?: UserRole | null
   roles?: UserRole[] | null
+  tenantId?: string | null
 }
 
 export function effectiveRoles(user: UserLike | null | undefined): UserRole[] {
@@ -27,4 +29,9 @@ export function hasAnyRole(
     if (allowedSet.has(r)) return true
   }
   return false
+}
+
+export function hasInvalidTenantSessionIdentity(user: UserLike | null | undefined): boolean {
+  if (!user?.tenantId || !user?.id) return false
+  return user.id.startsWith('demo-')
 }

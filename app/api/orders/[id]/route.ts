@@ -93,6 +93,14 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     if (data.isPaid !== undefined) updateData.isPaid = data.isPaid
     if (data.isShipped !== undefined) updateData.isShipped = data.isShipped
     if (data.isDocumentsSigned !== undefined) updateData.isDocumentsSigned = data.isDocumentsSigned
+    if (data.businessCreatedAt !== undefined)
+      updateData.businessCreatedAt = data.businessCreatedAt
+        ? new Date(data.businessCreatedAt)
+        : null
+    if (data.businessUpdatedAt !== undefined)
+      updateData.businessUpdatedAt = data.businessUpdatedAt
+        ? new Date(data.businessUpdatedAt)
+        : null
 
     const updated = await prisma.$transaction(async tx => {
       const order = await tx.order.update({
@@ -136,6 +144,8 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
             expiryDate: c.expiryDate ? new Date(c.expiryDate) : null,
             cardNumber: c.cardNumber ?? null,
             pinPackCodes: c.pinPackCodes ?? null,
+            businessCreatedAt: c.businessCreatedAt ? new Date(c.businessCreatedAt) : null,
+            businessUpdatedAt: c.businessUpdatedAt ? new Date(c.businessUpdatedAt) : null,
           }
 
           if (c.id) {

@@ -79,6 +79,8 @@ export async function POST(request: NextRequest) {
           bankAccount: data.bankAccount ?? null,
           bankCorr: data.bankCorr ?? null,
           isDefault: data.isDefault ?? false,
+          businessCreatedAt: data.businessCreatedAt ? new Date(data.businessCreatedAt) : null,
+          businessUpdatedAt: data.businessUpdatedAt ? new Date(data.businessUpdatedAt) : null,
         },
       })
     })

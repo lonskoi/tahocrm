@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Modal } from '@/components/ui/modal'
 import { useFormDraft } from '@/lib/hooks/use-form-draft'
+import { formatDateTime, isoToLocalInput, localInputToIso, pickBusinessDate } from '@/lib/datetime'
 
 type VehicleCategory = 'N1' | 'N2' | 'N3' | 'M1' | 'M2' | 'M3'
 
@@ -27,6 +28,10 @@ type Vehicle = {
   ownerAddress: string | null
   mileage: number | null
   tireSize: string | null
+  createdAt: string
+  updatedAt: string
+  businessCreatedAt: string | null
+  businessUpdatedAt: string | null
   customer?: { id: string; name: string } | null
   tachographs?: Array<{ id: string; serialNumber: string | null; model: string | null }>
 }
@@ -56,6 +61,8 @@ export default function VehiclesPage() {
   const [mileage, setMileage] = useState('')
   const [tireSize, setTireSize] = useState('')
   const [customerId, setCustomerId] = useState('')
+  const [businessCreatedAtLocal, setBusinessCreatedAtLocal] = useState('')
+  const [businessUpdatedAtLocal, setBusinessUpdatedAtLocal] = useState('')
   const [customers, setCustomers] = useState<Array<{ id: string; name: string }>>([])
 
   // Временное сохранение данных формы создания ТС
@@ -75,6 +82,8 @@ export default function VehiclesPage() {
     mileage,
     tireSize,
     customerId,
+    businessCreatedAtLocal,
+    businessUpdatedAtLocal,
   }
   const vehicleDraft = useFormDraft({ key: 'vehicle-new', enabled: isModalOpen }, vehicleFormData, [
     isModalOpen,
@@ -152,6 +161,12 @@ export default function VehiclesPage() {
         setMileage(draft.mileage?.toString() ?? vehicle.mileage?.toString() ?? '')
         setTireSize(draft.tireSize ?? vehicle.tireSize ?? '')
         setCustomerId(draft.customerId ?? vehicle.customer?.id ?? '')
+        setBusinessCreatedAtLocal(
+          draft.businessCreatedAtLocal ?? isoToLocalInput(vehicle.businessCreatedAt)
+        )
+        setBusinessUpdatedAtLocal(
+          draft.businessUpdatedAtLocal ?? isoToLocalInput(vehicle.businessUpdatedAt)
+        )
       } else {
         setGovNumber(vehicle.govNumber)
         setVin(vehicle.vin ?? '')
@@ -168,6 +183,8 @@ export default function VehiclesPage() {
         setMileage(vehicle.mileage?.toString() ?? '')
         setTireSize(vehicle.tireSize ?? '')
         setCustomerId(vehicle.customer?.id ?? '')
+        setBusinessCreatedAtLocal(isoToLocalInput(vehicle.businessCreatedAt))
+        setBusinessUpdatedAtLocal(isoToLocalInput(vehicle.businessUpdatedAt))
       }
     } else {
       setEditingVehicle(null)
@@ -187,6 +204,8 @@ export default function VehiclesPage() {
         setMileage(draft.mileage?.toString() ?? '')
         setTireSize(draft.tireSize ?? '')
         setCustomerId(draft.customerId ?? '')
+        setBusinessCreatedAtLocal(draft.businessCreatedAtLocal ?? '')
+        setBusinessUpdatedAtLocal(draft.businessUpdatedAtLocal ?? '')
       } else {
         setGovNumber('')
         setVin('')
@@ -203,6 +222,8 @@ export default function VehiclesPage() {
         setMileage('')
         setTireSize('')
         setCustomerId('')
+        setBusinessCreatedAtLocal('')
+        setBusinessUpdatedAtLocal('')
       }
     }
     loadCustomers()
@@ -229,6 +250,8 @@ export default function VehiclesPage() {
         mileage: mileage ? parseInt(mileage, 10) : null,
         tireSize: tireSize || null,
         customerId: customerId || null,
+        businessCreatedAt: localInputToIso(businessCreatedAtLocal),
+        businessUpdatedAt: localInputToIso(businessUpdatedAtLocal),
       }
 
       const res = await fetch(
@@ -304,6 +327,7 @@ export default function VehiclesPage() {
               <th className="px-4 py-3 text-left">Марка/модель</th>
               <th className="px-4 py-3 text-left">Клиент/собственник</th>
               <th className="px-4 py-3 text-left">Оборудование</th>
+              <th className="px-4 py-3 text-left">Дата/время</th>
               <th className="px-4 py-3 text-right">Действия</th>
             </tr>
           </thead>
@@ -342,6 +366,14 @@ export default function VehiclesPage() {
                     '—'
                   )}
                 </td>
+                <td className="px-4 py-3 text-xs text-gray-600">
+                  <div>
+                    Создано: {formatDateTime(pickBusinessDate(v.businessCreatedAt, v.createdAt))}
+                  </div>
+                  <div>
+                    Обновлено: {formatDateTime(pickBusinessDate(v.businessUpdatedAt, v.updatedAt))}
+                  </div>
+                </td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex justify-end gap-2">
                     <Button
@@ -366,7 +398,7 @@ export default function VehiclesPage() {
             ))}
             {filtered.length === 0 ? (
               <tr>
-                <td className="px-4 py-6 text-center text-gray-500" colSpan={6}>
+                <td className="px-4 py-6 text-center text-gray-500" colSpan={7}>
                   {loading ? 'Загрузка...' : 'ТС пока нет'}
                 </td>
               </tr>
@@ -480,6 +512,20 @@ export default function VehiclesPage() {
                 </option>
               ))}
             </select>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Input
+              label="Дата/время создания (бизнес)"
+              type="datetime-local"
+              value={businessCreatedAtLocal}
+              onChange={e => setBusinessCreatedAtLocal(e.target.value)}
+            />
+            <Input
+              label="Дата/время изменения (бизнес)"
+              type="datetime-local"
+              value={businessUpdatedAtLocal}
+              onChange={e => setBusinessUpdatedAtLocal(e.target.value)}
+            />
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="ghost" onClick={() => setIsModalOpen(false)} disabled={loading}>

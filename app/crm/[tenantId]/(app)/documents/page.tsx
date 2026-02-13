@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
+import { formatDateTime, localInputToIso, pickBusinessDate } from '@/lib/datetime'
 
 type DocumentRow = {
   id: string
@@ -12,6 +13,9 @@ type DocumentRow = {
   fileUrl: string
   fileName: string
   createdAt: string
+  updatedAt: string
+  businessCreatedAt: string | null
+  businessUpdatedAt: string | null
 }
 
 export default function DocumentsPage() {
@@ -25,6 +29,8 @@ export default function DocumentsPage() {
   const [title, setTitle] = useState('')
   const [fileName, setFileName] = useState('')
   const [fileUrl, setFileUrl] = useState('')
+  const [businessCreatedAtLocal, setBusinessCreatedAtLocal] = useState('')
+  const [businessUpdatedAtLocal, setBusinessUpdatedAtLocal] = useState('')
 
   async function load() {
     setLoading(true)
@@ -62,6 +68,8 @@ export default function DocumentsPage() {
     setTitle('')
     setFileName('')
     setFileUrl('')
+    setBusinessCreatedAtLocal('')
+    setBusinessUpdatedAtLocal('')
     setIsModalOpen(true)
   }
 
@@ -77,6 +85,8 @@ export default function DocumentsPage() {
           title: title || null,
           fileName,
           fileUrl,
+          businessCreatedAt: localInputToIso(businessCreatedAtLocal),
+          businessUpdatedAt: localInputToIso(businessUpdatedAtLocal),
         }),
       })
       const data = await res.json()
@@ -126,6 +136,7 @@ export default function DocumentsPage() {
               <th className="px-4 py-3 text-left">Тип</th>
               <th className="px-4 py-3 text-left">Название</th>
               <th className="px-4 py-3 text-left">Файл</th>
+              <th className="px-4 py-3 text-left">Дата/время</th>
             </tr>
           </thead>
           <tbody>
@@ -143,11 +154,19 @@ export default function DocumentsPage() {
                     {d.fileName}
                   </a>
                 </td>
+                <td className="px-4 py-3 text-xs text-gray-600">
+                  <div>
+                    Создано: {formatDateTime(pickBusinessDate(d.businessCreatedAt, d.createdAt))}
+                  </div>
+                  <div>
+                    Обновлено: {formatDateTime(pickBusinessDate(d.businessUpdatedAt, d.updatedAt))}
+                  </div>
+                </td>
               </tr>
             ))}
             {filtered.length === 0 ? (
               <tr>
-                <td className="px-4 py-6 text-center text-gray-500" colSpan={3}>
+                <td className="px-4 py-6 text-center text-gray-500" colSpan={4}>
                   {loading ? 'Загрузка...' : 'Документов пока нет'}
                 </td>
               </tr>
@@ -186,6 +205,18 @@ export default function DocumentsPage() {
             value={fileUrl}
             onChange={e => setFileUrl(e.target.value)}
             placeholder="https://..."
+          />
+          <Input
+            label="Дата/время создания (бизнес)"
+            type="datetime-local"
+            value={businessCreatedAtLocal}
+            onChange={e => setBusinessCreatedAtLocal(e.target.value)}
+          />
+          <Input
+            label="Дата/время изменения (бизнес)"
+            type="datetime-local"
+            value={businessUpdatedAtLocal}
+            onChange={e => setBusinessUpdatedAtLocal(e.target.value)}
           />
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="ghost" onClick={() => setIsModalOpen(false)} disabled={loading}>

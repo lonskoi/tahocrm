@@ -46,6 +46,12 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         ...(typeof data.price === 'number' ? { price: data.price } : {}),
         ...(data.vatRate ? { vatRate: data.vatRate } : {}),
         ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
+        ...(data.businessCreatedAt !== undefined
+          ? { businessCreatedAt: data.businessCreatedAt ? new Date(data.businessCreatedAt) : null }
+          : {}),
+        ...(data.businessUpdatedAt !== undefined
+          ? { businessUpdatedAt: data.businessUpdatedAt ? new Date(data.businessUpdatedAt) : null }
+          : {}),
       },
     })
     return NextResponse.json(updated)

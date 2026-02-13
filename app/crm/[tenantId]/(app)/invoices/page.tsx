@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
+import { formatDateTime, localInputToIso, pickBusinessDate } from '@/lib/datetime'
 
 type Invoice = {
   id: string
@@ -14,6 +15,9 @@ type Invoice = {
   customer: { id: string; name: string } | null
   issuerOrganization: { id: string; name: string } | null
   createdAt: string
+  updatedAt: string
+  businessCreatedAt: string | null
+  businessUpdatedAt: string | null
 }
 
 export default function InvoicesPage() {
@@ -24,6 +28,8 @@ export default function InvoicesPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [number, setNumber] = useState('')
+  const [businessCreatedAtLocal, setBusinessCreatedAtLocal] = useState('')
+  const [businessUpdatedAtLocal, setBusinessUpdatedAtLocal] = useState('')
 
   async function load() {
     setLoading(true)
@@ -59,6 +65,8 @@ export default function InvoicesPage() {
 
   function openCreate() {
     setNumber('')
+    setBusinessCreatedAtLocal('')
+    setBusinessUpdatedAtLocal('')
     setIsModalOpen(true)
   }
 
@@ -69,7 +77,11 @@ export default function InvoicesPage() {
       const res = await fetch('/api/invoices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ number }),
+        body: JSON.stringify({
+          number,
+          businessCreatedAt: localInputToIso(businessCreatedAtLocal),
+          businessUpdatedAt: localInputToIso(businessUpdatedAtLocal),
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || 'Не удалось создать счет')
@@ -120,6 +132,7 @@ export default function InvoicesPage() {
               <th className="px-4 py-3 text-left">Организация</th>
               <th className="px-4 py-3 text-left">Статус</th>
               <th className="px-4 py-3 text-right">Сумма</th>
+              <th className="px-4 py-3 text-left">Дата/время</th>
             </tr>
           </thead>
           <tbody>
@@ -134,11 +147,19 @@ export default function InvoicesPage() {
                 <td className="px-4 py-3 text-gray-700">{i.issuerOrganization?.name ?? '—'}</td>
                 <td className="px-4 py-3 text-gray-700">{i.status}</td>
                 <td className="px-4 py-3 text-right text-gray-700">{i.totalAmount}</td>
+                <td className="px-4 py-3 text-xs text-gray-600">
+                  <div>
+                    Создано: {formatDateTime(pickBusinessDate(i.businessCreatedAt, i.createdAt))}
+                  </div>
+                  <div>
+                    Обновлено: {formatDateTime(pickBusinessDate(i.businessUpdatedAt, i.updatedAt))}
+                  </div>
+                </td>
               </tr>
             ))}
             {filtered.length === 0 ? (
               <tr>
-                <td className="px-4 py-6 text-center text-gray-500" colSpan={5}>
+                <td className="px-4 py-6 text-center text-gray-500" colSpan={6}>
                   {loading ? 'Загрузка...' : 'Счетов пока нет'}
                 </td>
               </tr>
@@ -159,6 +180,18 @@ export default function InvoicesPage() {
             value={number}
             onChange={e => setNumber(e.target.value)}
             placeholder="Например: СЧ-0001"
+          />
+          <Input
+            label="Дата/время создания (бизнес)"
+            type="datetime-local"
+            value={businessCreatedAtLocal}
+            onChange={e => setBusinessCreatedAtLocal(e.target.value)}
+          />
+          <Input
+            label="Дата/время изменения (бизнес)"
+            type="datetime-local"
+            value={businessUpdatedAtLocal}
+            onChange={e => setBusinessUpdatedAtLocal(e.target.value)}
           />
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="ghost" onClick={() => setIsModalOpen(false)} disabled={loading}>

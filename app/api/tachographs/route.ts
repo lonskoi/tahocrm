@@ -119,6 +119,8 @@ export async function POST(request: NextRequest) {
                 ? new Date(new Date(workDate).setMonth(new Date(workDate).getMonth() + 35))
                 : null,
               isActive: true,
+              businessCreatedAt: workDate,
+              businessUpdatedAt: workDate,
             },
           })
           finalSkziId = newSkzi.id
@@ -150,6 +152,8 @@ export async function POST(request: NextRequest) {
             : data.workDate
           : null,
         tireSize: data.tireSize ?? null,
+        businessCreatedAt: data.businessCreatedAt ? new Date(data.businessCreatedAt) : null,
+        businessUpdatedAt: data.businessUpdatedAt ? new Date(data.businessUpdatedAt) : null,
       },
     })
 

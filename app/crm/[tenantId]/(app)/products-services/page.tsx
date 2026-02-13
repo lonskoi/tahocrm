@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 import { useFormDraft } from '@/lib/hooks/use-form-draft'
+import { formatDateTime, isoToLocalInput, localInputToIso, pickBusinessDate } from '@/lib/datetime'
 
 type VatRate = 'NONE' | 'VAT_5' | 'VAT_7' | 'VAT_10' | 'VAT_20' | 'VAT_22'
 
@@ -17,6 +18,9 @@ type Product = {
   vatRate: VatRate
   isActive: boolean
   createdAt: string
+  updatedAt: string
+  businessCreatedAt: string | null
+  businessUpdatedAt: string | null
 }
 
 type Service = {
@@ -28,6 +32,9 @@ type Service = {
   vatRate: VatRate
   isActive: boolean
   createdAt: string
+  updatedAt: string
+  businessCreatedAt: string | null
+  businessUpdatedAt: string | null
 }
 
 export default function ProductsServicesPage() {
@@ -46,9 +53,20 @@ export default function ProductsServicesPage() {
   const [price, setPrice] = useState('')
   const [vatRate, setVatRate] = useState<VatRate>('VAT_20')
   const [isActive, setIsActive] = useState(true)
+  const [businessCreatedAtLocal, setBusinessCreatedAtLocal] = useState('')
+  const [businessUpdatedAtLocal, setBusinessUpdatedAtLocal] = useState('')
   const [defaultVatRate, setDefaultVatRate] = useState<VatRate>('VAT_22')
 
-  const formData = { name, sku, unit, price, vatRate, isActive }
+  const formData = {
+    name,
+    sku,
+    unit,
+    price,
+    vatRate,
+    isActive,
+    businessCreatedAtLocal,
+    businessUpdatedAtLocal,
+  }
   const draft = useFormDraft(
     { key: `${tab}-${editingItem?.id || 'new'}`, enabled: isModalOpen },
     formData,
@@ -115,6 +133,8 @@ export default function ProductsServicesPage() {
       // Всегда используем defaultVatRate для новых товаров, игнорируя draft
       setVatRate(defaultVatRate)
       setIsActive(draftData.isActive ?? true)
+      setBusinessCreatedAtLocal(draftData.businessCreatedAtLocal ?? '')
+      setBusinessUpdatedAtLocal(draftData.businessUpdatedAtLocal ?? '')
     } else {
       setName('')
       setSku('')
@@ -122,6 +142,8 @@ export default function ProductsServicesPage() {
       setPrice('')
       setVatRate(defaultVatRate)
       setIsActive(true)
+      setBusinessCreatedAtLocal('')
+      setBusinessUpdatedAtLocal('')
     }
     setIsModalOpen(true)
   }
@@ -134,6 +156,8 @@ export default function ProductsServicesPage() {
     setPrice(item.price)
     setVatRate(item.vatRate)
     setIsActive(item.isActive)
+    setBusinessCreatedAtLocal(isoToLocalInput(item.businessCreatedAt))
+    setBusinessUpdatedAtLocal(isoToLocalInput(item.businessUpdatedAt))
     setIsModalOpen(true)
   }
 
@@ -148,6 +172,8 @@ export default function ProductsServicesPage() {
         price: price ? parseFloat(price) : 0,
         vatRate: vatRate,
         isActive: isActive,
+        businessCreatedAt: localInputToIso(businessCreatedAtLocal),
+        businessUpdatedAt: localInputToIso(businessUpdatedAtLocal),
       }
 
       const endpoint = tab === 'products' ? '/api/products' : '/api/services'
@@ -257,6 +283,7 @@ export default function ProductsServicesPage() {
               <th className="px-4 py-3 text-right">Цена</th>
               <th className="px-4 py-3 text-left">НДС</th>
               <th className="px-4 py-3 text-center">Статус</th>
+              <th className="px-4 py-3 text-left">Дата/время</th>
               <th className="px-4 py-3 text-right">Действия</th>
             </tr>
           </thead>
@@ -297,6 +324,16 @@ export default function ProductsServicesPage() {
                     </span>
                   )}
                 </td>
+                <td className="px-4 py-3 text-xs text-gray-600">
+                  <div>
+                    Создано:{' '}
+                    {formatDateTime(pickBusinessDate(item.businessCreatedAt, item.createdAt))}
+                  </div>
+                  <div>
+                    Обновлено:{' '}
+                    {formatDateTime(pickBusinessDate(item.businessUpdatedAt, item.updatedAt))}
+                  </div>
+                </td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex justify-end gap-2">
                     <Button
@@ -321,7 +358,7 @@ export default function ProductsServicesPage() {
             ))}
             {filtered.length === 0 ? (
               <tr>
-                <td className="px-4 py-6 text-center text-gray-500" colSpan={7}>
+                <td className="px-4 py-6 text-center text-gray-500" colSpan={8}>
                   {loading ? 'Загрузка...' : `${tab === 'products' ? 'Товары' : 'Услуги'} пока нет`}
                 </td>
               </tr>
@@ -384,6 +421,20 @@ export default function ProductsServicesPage() {
             <label htmlFor="isActive" className="text-sm font-medium text-gray-700">
               Активен
             </label>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Input
+              label="Дата/время создания (бизнес)"
+              type="datetime-local"
+              value={businessCreatedAtLocal}
+              onChange={e => setBusinessCreatedAtLocal(e.target.value)}
+            />
+            <Input
+              label="Дата/время изменения (бизнес)"
+              type="datetime-local"
+              value={businessUpdatedAtLocal}
+              onChange={e => setBusinessUpdatedAtLocal(e.target.value)}
+            />
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="ghost" onClick={() => setIsModalOpen(false)} disabled={loading}>

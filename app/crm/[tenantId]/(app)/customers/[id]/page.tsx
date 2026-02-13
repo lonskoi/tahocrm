@@ -10,6 +10,7 @@ import { Modal } from '@/components/ui/modal'
 import { useFormDraft } from '@/lib/hooks/use-form-draft'
 import { AuditHistory } from '@/components/audit/audit-history'
 import { ContextNav } from '@/components/nav/context-nav'
+import { formatDateTime, isoToLocalInput, localInputToIso } from '@/lib/datetime'
 
 type CustomerType = 'COMPANY' | 'SOLE_PROPRIETOR' | 'INDIVIDUAL'
 
@@ -49,6 +50,10 @@ type CustomerDetails = {
   phone: string | null
   email: string | null
   comment: string | null
+  createdAt: string
+  updatedAt: string
+  businessCreatedAt: string | null
+  businessUpdatedAt: string | null
   contacts: CustomerContact[]
   bankAccounts: CustomerBankAccount[]
   createdBy: { id: string; name: string; role: string } | null
@@ -596,6 +601,10 @@ export default function CustomerDetailsPage() {
           <p className="text-gray-600">
             {typeLabel} · ИНН: {data.inn ?? '—'}
           </p>
+          <p className="text-xs text-gray-500 mt-1">
+            Создано: {formatDateTime(data.businessCreatedAt ?? data.createdAt)} · Обновлено:{' '}
+            {formatDateTime(data.businessUpdatedAt ?? data.updatedAt)}
+          </p>
         </div>
         <div className="flex gap-2">
           <ContextNav
@@ -713,6 +722,22 @@ export default function CustomerDetailsPage() {
               rows={4}
               className="lg:col-span-2"
             />
+            <Input
+              label="Дата/время создания (бизнес)"
+              type="datetime-local"
+              value={isoToLocalInput(data.businessCreatedAt)}
+              onChange={e =>
+                setData({ ...data, businessCreatedAt: localInputToIso(e.target.value) })
+              }
+            />
+            <Input
+              label="Дата/время изменения (бизнес)"
+              type="datetime-local"
+              value={isoToLocalInput(data.businessUpdatedAt)}
+              onChange={e =>
+                setData({ ...data, businessUpdatedAt: localInputToIso(e.target.value) })
+              }
+            />
           </div>
 
           <div className="border-t border-gray-100 pt-6">
@@ -774,6 +799,8 @@ export default function CustomerDetailsPage() {
                   okpo: data.okpo,
                   fullName: data.fullName,
                   legalAddress: data.legalAddress,
+                  businessCreatedAt: data.businessCreatedAt,
+                  businessUpdatedAt: data.businessUpdatedAt,
                 })
               }
               isLoading={loading}

@@ -210,6 +210,8 @@ model Customer {
   createdById    String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+  businessCreatedAt DateTime?
+  businessUpdatedAt DateTime?
 
   tenant       Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   createdBy    User?                 @relation("CustomerCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
@@ -242,6 +244,8 @@ model Contact {
   comment    String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  businessCreatedAt DateTime?
+  businessUpdatedAt DateTime?
 
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
@@ -264,6 +268,8 @@ model CustomerBankAccount {
   comment       String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  businessCreatedAt DateTime?
+  businessUpdatedAt DateTime?
 
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
@@ -303,6 +309,8 @@ model IssuerOrganization {
   isDefault Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  businessCreatedAt DateTime?
+  businessUpdatedAt DateTime?
 
   tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   invoices Invoice[]
@@ -322,6 +330,8 @@ model Product {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  businessCreatedAt DateTime?
+  businessUpdatedAt DateTime?
 
   tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   invoiceItems InvoiceLineItem[]
@@ -342,6 +352,8 @@ model Service {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  businessCreatedAt DateTime?
+  businessUpdatedAt DateTime?
 
   tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   invoiceItems InvoiceLineItem[]
@@ -369,6 +381,9 @@ model Document {
 
   createdById String?
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  businessCreatedAt DateTime?
+  businessUpdatedAt DateTime?
 
   tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customer   Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
@@ -459,6 +474,8 @@ model User {
   isActive  Boolean   @default(true)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  businessCreatedAt DateTime?
+  businessUpdatedAt DateTime?
   lastLogin DateTime?
 
   // Relations
@@ -505,6 +522,8 @@ model Vehicle {
   notes        String?
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
+  businessCreatedAt DateTime?
+  businessUpdatedAt DateTime?
 
   // Relations
   tenant             Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -542,6 +561,8 @@ model Tachograph {
   tireSize          String? // Размерность резины
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
+  businessCreatedAt DateTime?
+  businessUpdatedAt DateTime?
 
   // Relations
   tenant             Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -569,6 +590,8 @@ model SKZI {
   mchd           String? // МЧД
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+  businessCreatedAt DateTime?
+  businessUpdatedAt DateTime?
 
   // Relations
   tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -616,6 +639,8 @@ model Order {
   isDocumentsSigned Boolean     @default(false) // подписаны ли отгрузочные документы
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
+  businessCreatedAt DateTime?
+  businessUpdatedAt DateTime?
   completedAt       DateTime?
 
   // Relations
@@ -690,6 +715,8 @@ model Task {
   confirmedAt DateTime?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
+  businessCreatedAt DateTime?
+  businessUpdatedAt DateTime?
 
   // Relations
   tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -733,6 +760,8 @@ model DriverCardRequest {
 
   createdAt            DateTime                @default(now())
   updatedAt            DateTime                @updatedAt
+  businessCreatedAt    DateTime?
+  businessUpdatedAt    DateTime?
 
   // Relations
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -826,6 +855,8 @@ model Invoice {
   isDocumentsSigned    Boolean       @default(false) // подписаны ли отгрузочные документы
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
+  businessCreatedAt    DateTime?
+  businessUpdatedAt    DateTime?
 
   // Relations
   tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)

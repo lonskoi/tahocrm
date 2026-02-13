@@ -26,6 +26,18 @@ const updateSkziSchema = z.object({
     .transform(v => (v === '' || v === null ? null : v ? new Date(v) : null)),
   isActive: z.boolean().optional(),
   mchd: z.string().trim().max(100).optional().nullable(),
+  businessCreatedAt: z
+    .string()
+    .datetime()
+    .optional()
+    .nullable()
+    .transform(v => (v === '' || v === null ? null : v ? new Date(v) : null)),
+  businessUpdatedAt: z
+    .string()
+    .datetime()
+    .optional()
+    .nullable()
+    .transform(v => (v === '' || v === null ? null : v ? new Date(v) : null)),
 })
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -99,6 +111,12 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         ...(data.expiryDate !== undefined ? { expiryDate: data.expiryDate } : {}),
         ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
         ...(data.mchd !== undefined ? { mchd: data.mchd } : {}),
+        ...(data.businessCreatedAt !== undefined
+          ? { businessCreatedAt: data.businessCreatedAt }
+          : {}),
+        ...(data.businessUpdatedAt !== undefined
+          ? { businessUpdatedAt: data.businessUpdatedAt }
+          : {}),
       },
     })
 

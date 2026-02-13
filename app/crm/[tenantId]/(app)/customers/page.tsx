@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { formatDateTime, pickBusinessDate } from '@/lib/datetime'
 
 type Customer = {
   id: string
@@ -13,6 +14,9 @@ type Customer = {
   phone: string | null
   email: string | null
   createdAt: string
+  updatedAt: string
+  businessCreatedAt: string | null
+  businessUpdatedAt: string | null
   _count?: { vehicles: number; orders: number; invoices: number }
 }
 
@@ -91,6 +95,7 @@ export default function CustomersPage() {
               <th className="px-4 py-3 text-left">ИНН</th>
               <th className="px-4 py-3 text-left">Контакты</th>
               <th className="px-4 py-3 text-left">Связи</th>
+              <th className="px-4 py-3 text-left">Дата/время</th>
             </tr>
           </thead>
           <tbody>
@@ -121,11 +126,19 @@ export default function CustomersPage() {
                     {c._count?.invoices ?? 0}
                   </div>
                 </td>
+                <td className="px-4 py-3 text-xs text-gray-600">
+                  <div>
+                    Создано: {formatDateTime(pickBusinessDate(c.businessCreatedAt, c.createdAt))}
+                  </div>
+                  <div>
+                    Обновлено: {formatDateTime(pickBusinessDate(c.businessUpdatedAt, c.updatedAt))}
+                  </div>
+                </td>
               </tr>
             ))}
             {filtered.length === 0 ? (
               <tr>
-                <td className="px-4 py-6 text-center text-gray-500" colSpan={4}>
+                <td className="px-4 py-6 text-center text-gray-500" colSpan={5}>
                   {loading ? 'Загрузка...' : 'Клиентов пока нет'}
                 </td>
               </tr>

@@ -5,16 +5,18 @@ import { checkTenantAccess } from '@/lib/tenant-check'
 import { handleApiError, ApiError } from '@/lib/api-error-handler'
 import { validateRequest } from '@/lib/validation/middleware'
 import { createCustomerBankAccountSchema } from '@/lib/validation/schemas'
+import { hasAnyRole } from '@/lib/authz'
+import type { UserRole } from '@prisma/client'
 
-const WRITE_ROLES = new Set(['TENANT_ADMIN', 'DIRECTOR', 'MANAGER'])
+const WRITE_ROLES = new Set<UserRole>(['TENANT_ADMIN', 'DIRECTOR', 'MANAGER'])
 
 async function canEditCustomer(
   prisma: ReturnType<typeof prismaTenant>,
   tenantId: string,
   customerId: string,
-  user: { id: string; role: string }
+  user: { id: string; role: UserRole; roles?: UserRole[] | null }
 ) {
-  if (WRITE_ROLES.has(user.role)) return true
+  if (hasAnyRole(user, WRITE_ROLES)) return true
   const customer = await prisma.customer.findFirst({
     where: { id: customerId, tenantId },
     select: {
@@ -83,6 +85,7 @@ export async function POST(request: NextRequest) {
     const allowed = await canEditCustomer(prisma, tenantId, data.customerId, {
       id: session.user.id,
       role: session.user.role,
+      roles: session.user.roles ?? [],
     })
     if (!allowed) throw new ApiError(403, 'Forbidden', 'FORBIDDEN')
 
@@ -96,6 +99,8 @@ export async function POST(request: NextRequest) {
         corrAccount: data.corrAccount ?? null,
         accountNumber: data.accountNumber ?? null,
         comment: data.comment ?? null,
+        businessCreatedAt: data.businessCreatedAt ? new Date(data.businessCreatedAt) : null,
+        businessUpdatedAt: data.businessUpdatedAt ? new Date(data.businessUpdatedAt) : null,
       },
     })
 

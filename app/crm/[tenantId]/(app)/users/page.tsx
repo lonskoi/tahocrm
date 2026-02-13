@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 import type { UserRole } from '@prisma/client'
+import { formatDateTime, isoToLocalInput, localInputToIso, pickBusinessDate } from '@/lib/datetime'
 
 type UserRow = {
   id: string
@@ -18,6 +19,8 @@ type UserRow = {
   isActive: boolean
   createdAt: string
   updatedAt: string
+  businessCreatedAt: string | null
+  businessUpdatedAt: string | null
   lastLogin: string | null
 }
 
@@ -56,6 +59,8 @@ export default function UsersPage() {
   const [formRole, setFormRole] = useState<Exclude<UserRole, 'SUPER_ADMIN'>>('MANAGER') // primary
   const [formRoles, setFormRoles] = useState<Array<Exclude<UserRole, 'SUPER_ADMIN'>>>([]) // additional
   const [formIsActive, setFormIsActive] = useState(true)
+  const [businessCreatedAtLocal, setBusinessCreatedAtLocal] = useState('')
+  const [businessUpdatedAtLocal, setBusinessUpdatedAtLocal] = useState('')
 
   const sortedUsers = useMemo(() => {
     return [...users].sort((a, b) => a.createdAt.localeCompare(b.createdAt) * -1)
@@ -91,6 +96,8 @@ export default function UsersPage() {
     setFormRole('MANAGER')
     setFormRoles([])
     setFormIsActive(true)
+    setBusinessCreatedAtLocal('')
+    setBusinessUpdatedAtLocal('')
     setIsModalOpen(true)
   }
 
@@ -107,6 +114,8 @@ export default function UsersPage() {
       >
     )
     setFormIsActive(u.isActive)
+    setBusinessCreatedAtLocal(isoToLocalInput(u.businessCreatedAt))
+    setBusinessUpdatedAtLocal(isoToLocalInput(u.businessUpdatedAt))
     setIsModalOpen(true)
   }
 
@@ -138,6 +147,8 @@ export default function UsersPage() {
             role: formRole,
             roles: formRoles,
             isActive: formIsActive,
+            businessCreatedAt: localInputToIso(businessCreatedAtLocal),
+            businessUpdatedAt: localInputToIso(businessUpdatedAtLocal),
           }),
         })
         const data = await res.json()
@@ -150,6 +161,8 @@ export default function UsersPage() {
           role: formRole,
           roles: formRoles,
           isActive: formIsActive,
+          businessCreatedAt: localInputToIso(businessCreatedAtLocal),
+          businessUpdatedAt: localInputToIso(businessUpdatedAtLocal),
         }
         if (formPassword) body.password = formPassword
 
@@ -215,6 +228,7 @@ export default function UsersPage() {
               <th className="px-4 py-3 text-left">Телефон</th>
               <th className="px-4 py-3 text-left">Роль</th>
               <th className="px-4 py-3 text-left">Активен</th>
+              <th className="px-4 py-3 text-left">Дата/время</th>
               <th className="px-4 py-3 text-right">Действия</th>
             </tr>
           </thead>
@@ -239,6 +253,14 @@ export default function UsersPage() {
                   ) : null}
                 </td>
                 <td className="px-4 py-3 text-gray-700">{u.isActive ? 'Да' : 'Нет'}</td>
+                <td className="px-4 py-3 text-xs text-gray-600">
+                  <div>
+                    Создано: {formatDateTime(pickBusinessDate(u.businessCreatedAt, u.createdAt))}
+                  </div>
+                  <div>
+                    Обновлено: {formatDateTime(pickBusinessDate(u.businessUpdatedAt, u.updatedAt))}
+                  </div>
+                </td>
                 <td className="px-4 py-3 text-right">
                   <div className="inline-flex gap-2">
                     <Button
@@ -263,7 +285,7 @@ export default function UsersPage() {
             ))}
             {sortedUsers.length === 0 ? (
               <tr>
-                <td className="px-4 py-6 text-center text-gray-500" colSpan={6}>
+                <td className="px-4 py-6 text-center text-gray-500" colSpan={7}>
                   {loading ? 'Загрузка...' : 'Пользователей пока нет'}
                 </td>
               </tr>
@@ -341,6 +363,20 @@ export default function UsersPage() {
             />
             <span className="text-sm text-gray-800">Активен</span>
           </label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Input
+              label="Дата/время создания (бизнес)"
+              type="datetime-local"
+              value={businessCreatedAtLocal}
+              onChange={e => setBusinessCreatedAtLocal(e.target.value)}
+            />
+            <Input
+              label="Дата/время изменения (бизнес)"
+              type="datetime-local"
+              value={businessUpdatedAtLocal}
+              onChange={e => setBusinessUpdatedAtLocal(e.target.value)}
+            />
+          </div>
 
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="ghost" onClick={() => setIsModalOpen(false)} disabled={loading}>

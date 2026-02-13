@@ -75,6 +75,8 @@ export async function POST(request: NextRequest) {
         price: typeof data.price === 'number' ? data.price : 0,
         vatRate: (data.vatRate ?? defaultVatRate) as VatRate,
         isActive: data.isActive ?? true,
+        businessCreatedAt: data.businessCreatedAt ? new Date(data.businessCreatedAt) : null,
+        businessUpdatedAt: data.businessUpdatedAt ? new Date(data.businessUpdatedAt) : null,
       },
     })
     return NextResponse.json(created, { status: 201 })

@@ -247,7 +247,14 @@ export default function CustomerOrderDetailsPage() {
     }
   }, [id])
 
-  const loadCustomers = useCallback(async () => {
+  useEffect(() => {
+    if (id) loadOrder()
+    loadCustomers()
+    loadProducts()
+    loadServices()
+  }, [id, loadOrder])
+
+  async function loadCustomers() {
     try {
       const res = await fetch('/api/customers')
       if (res.ok) {
@@ -264,7 +271,7 @@ export default function CustomerOrderDetailsPage() {
     } catch {
       // Ignore
     }
-  }, [])
+  }
 
   async function quickCreateCustomer() {
     const name = newCustomerName.trim()
@@ -301,7 +308,7 @@ export default function CustomerOrderDetailsPage() {
     }
   }
 
-  const loadProducts = useCallback(async () => {
+  async function loadProducts() {
     try {
       const res = await fetch('/api/products')
       if (res.ok) {
@@ -311,9 +318,9 @@ export default function CustomerOrderDetailsPage() {
     } catch {
       // Ignore
     }
-  }, [])
+  }
 
-  const loadServices = useCallback(async () => {
+  async function loadServices() {
     try {
       const res = await fetch('/api/services')
       if (res.ok) {
@@ -323,14 +330,7 @@ export default function CustomerOrderDetailsPage() {
     } catch {
       // Ignore
     }
-  }, [])
-
-  useEffect(() => {
-    if (id) void loadOrder()
-    void loadCustomers()
-    void loadProducts()
-    void loadServices()
-  }, [id, loadOrder, loadCustomers, loadProducts, loadServices])
+  }
 
   function openAddItem(type: 'product' | 'service') {
     setItemType(type)

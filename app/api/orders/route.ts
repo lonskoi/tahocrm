@@ -6,7 +6,7 @@ import { handleApiError, ApiError } from '@/lib/api-error-handler'
 import { validateRequest } from '@/lib/validation/middleware'
 import { createOrderCrmSchema } from '@/lib/validation/schemas'
 import { nextDocumentNumber } from '@/lib/documents/numbering'
-import { hasAnyRole } from '@/lib/authz'
+import { hasAnyRole, hasInvalidTenantSessionIdentity } from '@/lib/authz'
 import type { UserRole } from '@prisma/client'
 
 const WRITE_ROLES = new Set<UserRole>(['TENANT_ADMIN', 'DIRECTOR', 'MANAGER', 'CARD_SPECIALIST'])
@@ -19,6 +19,9 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth()
     if (!session?.user) throw new ApiError(401, 'Unauthorized', 'UNAUTHORIZED')
+    if (hasInvalidTenantSessionIdentity(session.user)) {
+      throw new ApiError(401, 'Invalid session identity. Please sign in again.', 'INVALID_SESSION')
+    }
     userId = session.user.id
     tenantIdForLog = session.user.tenantId ?? undefined
 
@@ -65,6 +68,9 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session?.user) throw new ApiError(401, 'Unauthorized', 'UNAUTHORIZED')
+    if (hasInvalidTenantSessionIdentity(session.user)) {
+      throw new ApiError(401, 'Invalid session identity. Please sign in again.', 'INVALID_SESSION')
+    }
     userId = session.user.id
     tenantIdForLog = session.user.tenantId ?? undefined
 
@@ -109,6 +115,8 @@ export async function POST(request: NextRequest) {
           isPaid: data.isPaid ?? false,
           isShipped: data.isShipped ?? false,
           isDocumentsSigned: data.isDocumentsSigned ?? false,
+          businessCreatedAt: data.businessCreatedAt ? new Date(data.businessCreatedAt) : null,
+          businessUpdatedAt: data.businessUpdatedAt ? new Date(data.businessUpdatedAt) : null,
           createdById: session.user.id,
         },
       })
@@ -145,6 +153,8 @@ export async function POST(request: NextRequest) {
               expiryDate: c.expiryDate ? new Date(c.expiryDate) : null,
               cardNumber: c.cardNumber ?? null,
               pinPackCodes: c.pinPackCodes ?? null,
+              businessCreatedAt: c.businessCreatedAt ? new Date(c.businessCreatedAt) : null,
+              businessUpdatedAt: c.businessUpdatedAt ? new Date(c.businessUpdatedAt) : null,
             } as any,
             select: { id: true },
           })

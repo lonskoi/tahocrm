@@ -95,6 +95,8 @@ export async function POST(request: NextRequest) {
         invoiceId: data.invoiceId ?? null,
         vehicleId: data.vehicleId ?? null,
         tachographId: data.tachographId ?? null,
+        businessCreatedAt: data.businessCreatedAt ? new Date(data.businessCreatedAt) : null,
+        businessUpdatedAt: data.businessUpdatedAt ? new Date(data.businessUpdatedAt) : null,
         createdById: session.user.id,
       },
     })

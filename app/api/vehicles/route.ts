@@ -88,6 +88,8 @@ export async function POST(request: NextRequest) {
         mileage: data.mileage ?? null,
         tireSize: data.tireSize ?? null,
         notes: data.notes ?? null,
+        businessCreatedAt: data.businessCreatedAt ? new Date(data.businessCreatedAt) : null,
+        businessUpdatedAt: data.businessUpdatedAt ? new Date(data.businessUpdatedAt) : null,
       },
     })
 

@@ -144,6 +144,12 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         ...(data.mileage !== undefined ? { mileage: data.mileage } : {}),
         ...(data.tireSize !== undefined ? { tireSize: data.tireSize } : {}),
         ...(data.notes !== undefined ? { notes: data.notes } : {}),
+        ...(data.businessCreatedAt !== undefined
+          ? { businessCreatedAt: data.businessCreatedAt ? new Date(data.businessCreatedAt) : null }
+          : {}),
+        ...(data.businessUpdatedAt !== undefined
+          ? { businessUpdatedAt: data.businessUpdatedAt ? new Date(data.businessUpdatedAt) : null }
+          : {}),
       },
     })
 

@@ -77,6 +77,12 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         ...(data.invoiceId !== undefined ? { invoiceId: data.invoiceId } : {}),
         ...(data.vehicleId !== undefined ? { vehicleId: data.vehicleId } : {}),
         ...(data.tachographId !== undefined ? { tachographId: data.tachographId } : {}),
+        ...(data.businessCreatedAt !== undefined
+          ? { businessCreatedAt: data.businessCreatedAt ? new Date(data.businessCreatedAt) : null }
+          : {}),
+        ...(data.businessUpdatedAt !== undefined
+          ? { businessUpdatedAt: data.businessUpdatedAt ? new Date(data.businessUpdatedAt) : null }
+          : {}),
       },
     })
 

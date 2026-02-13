@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { formatDateTime, pickBusinessDate } from '@/lib/datetime'
 
 type CustomerOrder = {
   id: string
@@ -23,6 +24,9 @@ type CustomerOrder = {
     isDocumentsSigned: boolean
   }>
   createdAt: string
+  updatedAt: string
+  businessCreatedAt: string | null
+  businessUpdatedAt: string | null
 }
 
 export default function CustomerOrdersPage() {
@@ -104,6 +108,7 @@ export default function CustomerOrdersPage() {
               <th className="px-4 py-3 text-center">Оплата</th>
               <th className="px-4 py-3 text-center">Отгрузка</th>
               <th className="px-4 py-3 text-center">Подпись</th>
+              <th className="px-4 py-3 text-left">Дата/время</th>
               <th className="px-4 py-3 text-right">Действия</th>
             </tr>
           </thead>
@@ -177,6 +182,16 @@ export default function CustomerOrdersPage() {
                       </span>
                     )}
                   </td>
+                  <td className="px-4 py-3 text-xs text-gray-600">
+                    <div>
+                      Создано:{' '}
+                      {formatDateTime(pickBusinessDate(order.businessCreatedAt, order.createdAt))}
+                    </div>
+                    <div>
+                      Обновлено:{' '}
+                      {formatDateTime(pickBusinessDate(order.businessUpdatedAt, order.updatedAt))}
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
                     <div className="flex justify-end gap-2">
                       <Link href={`/crm/${tenantId}/customer-orders/${order.id}`}>
@@ -191,7 +206,7 @@ export default function CustomerOrdersPage() {
             })}
             {filtered.length === 0 ? (
               <tr>
-                <td className="px-4 py-6 text-center text-gray-500" colSpan={7}>
+                <td className="px-4 py-6 text-center text-gray-500" colSpan={8}>
                   {loading ? 'Загрузка...' : 'Заказы пока нет'}
                 </td>
               </tr>

@@ -9,13 +9,13 @@ import { logChange } from '@/lib/audit'
 import { hasAnyRole, hasRole } from '@/lib/authz'
 import type { UserRole } from '@prisma/client'
 
-const WRITE_ROLES = new Set<UserRole>(['TENANT_ADMIN', 'DIRECTOR', 'MANAGER'])
+const WRITE_ROLES = new Set<UserRole>(['TENANT_ADMIN', 'DIRECTOR', 'MANAGER', 'CARD_SPECIALIST'])
 
 async function canEditCustomer(
   prisma: ReturnType<typeof prismaTenant>,
   tenantId: string,
   customerId: string,
-  user: { id: string; role?: UserRole | null; roles?: UserRole[] | null }
+  user: { id: string; role: UserRole; roles?: UserRole[] | null }
 ) {
   if (hasAnyRole(user, WRITE_ROLES)) return true
   const customer = await prisma.customer.findFirst({
@@ -119,7 +119,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     const allowed = await canEditCustomer(prisma, tenantId, id, {
       id: session.user.id,
       role: session.user.role,
-      roles: session.user.roles,
+      roles: session.user.roles ?? [],
     })
     if (!allowed) throw new ApiError(403, 'Forbidden', 'FORBIDDEN')
 
@@ -167,6 +167,12 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         ...(data.phone !== undefined ? { phone: data.phone } : {}),
         ...(data.email !== undefined ? { email: data.email } : {}),
         ...(data.comment !== undefined ? { comment: data.comment } : {}),
+        ...(data.businessCreatedAt !== undefined
+          ? { businessCreatedAt: data.businessCreatedAt ? new Date(data.businessCreatedAt) : null }
+          : {}),
+        ...(data.businessUpdatedAt !== undefined
+          ? { businessUpdatedAt: data.businessUpdatedAt ? new Date(data.businessUpdatedAt) : null }
+          : {}),
       },
     })
 

@@ -32,7 +32,17 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 
     const validation = await validateRequest(request, updateUserSchema)
     if (validation.error) return validation.error
-    const { email, password, name, phone, role, roles, isActive } = validation.data
+    const {
+      email,
+      password,
+      name,
+      phone,
+      role,
+      roles,
+      isActive,
+      businessCreatedAt,
+      businessUpdatedAt,
+    } = validation.data
 
     if (role === 'SUPER_ADMIN') throw new ApiError(400, 'Invalid role', 'INVALID_ROLE')
     if (Array.isArray(roles) && roles.includes('SUPER_ADMIN'))
@@ -45,6 +55,10 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     if (typeof role === 'string') data.role = role
     if (typeof isActive === 'boolean') data.isActive = isActive
     if (typeof password === 'string') data.password = await bcrypt.hash(password, 10)
+    if (businessCreatedAt !== undefined)
+      data.businessCreatedAt = businessCreatedAt ? new Date(businessCreatedAt) : null
+    if (businessUpdatedAt !== undefined)
+      data.businessUpdatedAt = businessUpdatedAt ? new Date(businessUpdatedAt) : null
 
     const prisma = prismaTenant(tenantId)
     const existing = await prisma.user.findFirst({
@@ -75,6 +89,8 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         isActive: true,
         createdAt: true,
         updatedAt: true,
+        businessCreatedAt: true,
+        businessUpdatedAt: true,
         lastLogin: true,
       },
     })

@@ -56,6 +56,16 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
           ...(data.bankAccount !== undefined ? { bankAccount: data.bankAccount } : {}),
           ...(data.bankCorr !== undefined ? { bankCorr: data.bankCorr } : {}),
           ...(data.isDefault !== undefined ? { isDefault: data.isDefault } : {}),
+          ...(data.businessCreatedAt !== undefined
+            ? {
+                businessCreatedAt: data.businessCreatedAt ? new Date(data.businessCreatedAt) : null,
+              }
+            : {}),
+          ...(data.businessUpdatedAt !== undefined
+            ? {
+                businessUpdatedAt: data.businessUpdatedAt ? new Date(data.businessUpdatedAt) : null,
+              }
+            : {}),
         },
       })
     })

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { useFormDraft } from '@/lib/hooks/use-form-draft'
+import { localInputToIso } from '@/lib/datetime'
 
 type CustomerType = 'COMPANY' | 'SOLE_PROPRIETOR' | 'INDIVIDUAL'
 
@@ -32,6 +33,8 @@ export default function NewCustomerPage() {
   const [kpp, setKpp] = useState('')
   const [ogrn, setOgrn] = useState('')
   const [okpo, setOkpo] = useState('')
+  const [businessCreatedAtLocal, setBusinessCreatedAtLocal] = useState('')
+  const [businessUpdatedAtLocal, setBusinessUpdatedAtLocal] = useState('')
 
   // Временное сохранение данных формы создания клиента
   const customerFormData = {
@@ -48,6 +51,8 @@ export default function NewCustomerPage() {
     kpp,
     ogrn,
     okpo,
+    businessCreatedAtLocal,
+    businessUpdatedAtLocal,
   }
   const customerDraft = useFormDraft({ key: 'customer-new', enabled: true }, customerFormData, [])
 
@@ -68,6 +73,8 @@ export default function NewCustomerPage() {
       setKpp(draft.kpp ?? '')
       setOgrn(draft.ogrn ?? '')
       setOkpo(draft.okpo ?? '')
+      setBusinessCreatedAtLocal(draft.businessCreatedAtLocal ?? '')
+      setBusinessUpdatedAtLocal(draft.businessUpdatedAtLocal ?? '')
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -92,6 +99,8 @@ export default function NewCustomerPage() {
           kpp: kpp || null,
           ogrn: ogrn || null,
           okpo: okpo || null,
+          businessCreatedAt: localInputToIso(businessCreatedAtLocal),
+          businessUpdatedAt: localInputToIso(businessUpdatedAtLocal),
         }),
       })
       const data = await res.json()
@@ -204,6 +213,24 @@ export default function NewCustomerPage() {
               onChange={e => setLegalAddress(e.target.value)}
               rows={3}
               className="lg:col-span-2"
+            />
+          </div>
+        </div>
+
+        <div className="border-t border-gray-100 pt-6">
+          <div className="font-semibold text-gray-900 mb-3">Бизнес-даты (редактируемые)</div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Input
+              label="Дата/время создания (бизнес)"
+              type="datetime-local"
+              value={businessCreatedAtLocal}
+              onChange={e => setBusinessCreatedAtLocal(e.target.value)}
+            />
+            <Input
+              label="Дата/время изменения (бизнес)"
+              type="datetime-local"
+              value={businessUpdatedAtLocal}
+              onChange={e => setBusinessUpdatedAtLocal(e.target.value)}
             />
           </div>
         </div>

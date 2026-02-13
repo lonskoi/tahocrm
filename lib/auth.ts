@@ -5,6 +5,13 @@ import bcrypt from 'bcryptjs'
 import { prismaMaster, prismaTenant } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 
+function hasSyntheticTenantIdentity(
+  id: string | null | undefined,
+  tenantId: string | null | undefined
+) {
+  return Boolean(tenantId && id && id.startsWith('demo-'))
+}
+
 export const authOptions: NextAuthConfig = {
   providers: [
     Credentials({
@@ -28,11 +35,76 @@ export const authOptions: NextAuthConfig = {
           const email = credentials.email as string
           const password = credentials.password as string
           const tenantId = (credentials.tenantId as string | undefined) ?? undefined
+          const isDev = process.env.NODE_ENV !== 'production'
+          const isTenantAdminDemo =
+            email === 'tenant-admin@test.com' && (password === 'admin' || password === 'admin123')
+          const isManagerDemo =
+            email === 'manager@test.com' && (password === 'manager' || password === 'manager123')
+          const isTenantDemoLogin = isTenantAdminDemo || isManagerDemo
 
           // ---- DB-backed auth ----
           // Tenant-scoped login: /crm/<tenantId>/login
           if (tenantId) {
             const prisma = prismaTenant(tenantId)
+            // Dev-only fallback for tenant demo accounts.
+            // This path is never active in production and cannot weaken server auth flow.
+            if (isDev && isTenantDemoLogin) {
+              const role: UserRole = isTenantAdminDemo ? 'TENANT_ADMIN' : 'MANAGER'
+              const name = isTenantAdminDemo ? 'Админ мастерской' : 'Менеджер'
+              try {
+                const hashedPassword = await bcrypt.hash(password, 10)
+                const now = new Date()
+                const demoUser = await prisma.user.upsert({
+                  where: { email },
+                  update: {
+                    password: hashedPassword,
+                    name,
+                    role,
+                    tenantId,
+                    isActive: true,
+                    lastLogin: now,
+                  },
+                  create: {
+                    email,
+                    password: hashedPassword,
+                    name,
+                    role,
+                    tenantId,
+                    isActive: true,
+                    lastLogin: now,
+                  },
+                })
+
+                logger.info('auth.credentials.authorize: tenant demo provisioned', {
+                  tenantId,
+                  email,
+                  userId: demoUser.id,
+                  role: demoUser.role,
+                  durationMs: Date.now() - startedAt,
+                })
+
+                return {
+                  id: demoUser.id,
+                  email: demoUser.email,
+                  name: demoUser.name,
+                  role: demoUser.role,
+                  roles: (demoUser as unknown as { roles?: UserRole[] | null }).roles ?? [],
+                  tenantId: demoUser.tenantId,
+                }
+              } catch (error) {
+                // Root-cause policy: never create synthetic tenant session identities.
+                // If tenant user provisioning fails, login must fail so we don't break FK invariants.
+                logger.warn('auth.credentials.authorize: tenant demo provisioning failed', {
+                  tenantId,
+                  email,
+                  role,
+                  error: error instanceof Error ? error.message : String(error),
+                  durationMs: Date.now() - startedAt,
+                })
+                return null
+              }
+            }
+
             const user = await prisma.user.findUnique({ where: { email } })
             if (!user) {
               logger.warn('auth.credentials.authorize: tenant user not found', {
@@ -83,43 +155,6 @@ export const authOptions: NextAuthConfig = {
                 role: user.role,
                 roles: (user as unknown as { roles?: UserRole[] | null }).roles ?? [],
                 tenantId: user.tenantId,
-              }
-            }
-
-            // Dev convenience: if tenant DB is empty, allow demo accounts by provisioning them in tenant DB.
-            if (process.env.NODE_ENV !== 'production') {
-              const isTenantAdminDemo =
-                email === 'tenant-admin@test.com' &&
-                (password === 'admin' || password === 'admin123')
-              const isManagerDemo =
-                email === 'manager@test.com' &&
-                (password === 'manager' || password === 'manager123')
-
-              if (isTenantAdminDemo || isManagerDemo) {
-                const role: UserRole = isTenantAdminDemo ? 'TENANT_ADMIN' : 'MANAGER'
-                const name = isTenantAdminDemo ? 'Админ мастерской' : 'Менеджер'
-                const hashedPassword = await bcrypt.hash(password, 10)
-
-                const created = await prisma.user.create({
-                  data: {
-                    email,
-                    password: hashedPassword,
-                    name,
-                    role,
-                    tenantId,
-                    isActive: true,
-                    lastLogin: new Date(),
-                  },
-                })
-
-                return {
-                  id: created.id,
-                  email: created.email,
-                  name: created.name,
-                  role: created.role,
-                  roles: [],
-                  tenantId: created.tenantId,
-                }
               }
             }
 
@@ -197,6 +232,24 @@ export const authOptions: NextAuthConfig = {
   ],
   callbacks: {
     async jwt({ token, user }) {
+      const identityId = (user?.id as string | undefined) ?? (token.id as string | undefined)
+      const identityTenantId =
+        (user as { tenantId?: string | null } | undefined)?.tenantId ??
+        null ??
+        (token.tenantId as string | null | undefined)
+
+      if (hasSyntheticTenantIdentity(identityId, identityTenantId)) {
+        logger.warn('auth.jwt: synthetic tenant identity rejected', {
+          tenantId: identityTenantId,
+          userId: identityId,
+        })
+        delete (token as Record<string, unknown>).id
+        delete (token as Record<string, unknown>).role
+        ;(token as Record<string, unknown>).roles = []
+        ;(token as Record<string, unknown>).tenantId = null
+        return token
+      }
+
       if (user) {
         token.id = user.id
         token.role = (user as { role: UserRole }).role

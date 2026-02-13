@@ -5,20 +5,23 @@ import { logger, logDatabaseQuery } from './logger'
  * Проверка активности и подписки мастерской
  * Используется в middleware и API routes для контроля доступа
  */
-export async function checkTenantAccess(tenantId: string | null): Promise<{
+export async function checkTenantAccess(rawTenantId: string | null): Promise<{
   allowed: boolean
   reason?: string
 }> {
   const startTime = Date.now()
+  const tenantId =
+    typeof rawTenantId === 'string' && rawTenantId.trim().length > 0 ? rawTenantId.trim() : null
 
   try {
     logger.debug('checkTenantAccess - Starting check', {
-      tenantId,
+      tenantId: tenantId ?? rawTenantId,
       timestamp: new Date().toISOString(),
     })
 
     if (!tenantId) {
       logger.warn('checkTenantAccess - Tenant ID is required', {
+        tenantId: rawTenantId,
         timestamp: new Date().toISOString(),
       })
       return { allowed: false, reason: 'Tenant ID is required' }
@@ -109,24 +112,31 @@ export async function checkTenantAccess(tenantId: string | null): Promise<{
     const duration = Date.now() - startTime
     const errorMessage = error instanceof Error ? error.message : String(error)
     const errorStack = error instanceof Error ? error.stack : undefined
+    const errorCode =
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      typeof (error as { code?: unknown }).code === 'string'
+        ? ((error as { code: string }).code ?? '')
+        : ''
+    const isConnectionIssue =
+      errorCode === 'ECONNREFUSED' ||
+      errorMessage.includes('connect') ||
+      errorMessage.includes('connection') ||
+      errorMessage.includes('P1001') ||
+      errorMessage.includes("Can't reach database")
 
     logger.error('checkTenantAccess - Error', {
-      tenantId,
+      tenantId: tenantId ?? rawTenantId,
       error: errorMessage,
+      code: errorCode || undefined,
       stack: errorStack,
       duration: `${duration}ms`,
       timestamp: new Date().toISOString(),
     })
 
     // Более детальное сообщение об ошибке для диагностики
-    if (errorMessage.includes('connect') || errorMessage.includes('connection')) {
-      return {
-        allowed: false,
-        reason: 'Database connection error. Please check DATABASE_URL_MASTER configuration.',
-      }
-    }
-
-    if (errorMessage.includes('P1001') || errorMessage.includes("Can't reach database")) {
+    if (isConnectionIssue) {
       return {
         allowed: false,
         reason: 'Cannot reach master database. Please ensure PostgreSQL is running.',

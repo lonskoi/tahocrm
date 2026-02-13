@@ -3,6 +3,8 @@ import { auth } from '@/auth'
 import { prismaTenant } from '@/lib/prisma'
 import { checkTenantAccess } from '@/lib/tenant-check'
 import { handleApiError, ApiError } from '@/lib/api-error-handler'
+import { hasAnyRole } from '@/lib/authz'
+import type { UserRole } from '@prisma/client'
 import type { VatRate } from '@prisma/client'
 import ExcelJS from 'exceljs'
 import { readFile } from 'fs/promises'
@@ -52,6 +54,13 @@ function formatRuDateLong(d: Date): string {
     month: 'long',
     year: 'numeric',
   }).format(d)
+}
+
+function pickBusinessDate(
+  businessDate: Date | null | undefined,
+  fallbackDate: Date | null | undefined
+): Date | null {
+  return businessDate ?? fallbackDate ?? null
 }
 
 type PositionCtx = {
@@ -360,9 +369,16 @@ export async function GET(request: NextRequest) {
 
     const ctx: UpdCtx = {
       invoiceNumber: invoice.number,
-      invoiceDate: invoice.issueDate,
+      invoiceDate:
+        pickBusinessDate(invoice.businessCreatedAt, invoice.issueDate ?? invoice.createdAt) ??
+        invoice.createdAt,
       orderNumber: invoice.order?.number ?? null,
-      orderDate: invoice.order?.createdAt ?? null,
+      orderDate: invoice.order
+        ? pickBusinessDate(
+            invoice.order.businessCreatedAt,
+            invoice.order.documentDate ?? invoice.order.createdAt
+          )
+        : null,
       currencyCode: 'RUB',
       currencyDescription: 'Российский рубль',
       issuer: {

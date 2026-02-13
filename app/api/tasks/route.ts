@@ -6,7 +6,7 @@ import { handleApiError, ApiError } from '@/lib/api-error-handler'
 import { checkTenantAccess } from '@/lib/tenant-check'
 import { validateRequest } from '@/lib/validation/middleware'
 import { createTaskSchema } from '@/lib/validation/schemas'
-import { hasRole } from '@/lib/authz'
+import { hasInvalidTenantSessionIdentity, hasRole } from '@/lib/authz'
 
 export async function GET(request: NextRequest) {
   const startTime = Date.now()
@@ -27,6 +27,9 @@ export async function GET(request: NextRequest) {
         timestamp: new Date().toISOString(),
       })
       throw new ApiError(401, 'Unauthorized', 'UNAUTHORIZED')
+    }
+    if (hasInvalidTenantSessionIdentity(session.user)) {
+      throw new ApiError(401, 'Invalid session identity. Please sign in again.', 'INVALID_SESSION')
     }
     userId = session.user.id
     tenantIdForLog = session.user.tenantId || undefined
@@ -137,6 +140,9 @@ export async function POST(request: NextRequest) {
       })
       throw new ApiError(401, 'Unauthorized', 'UNAUTHORIZED')
     }
+    if (hasInvalidTenantSessionIdentity(session.user)) {
+      throw new ApiError(401, 'Invalid session identity. Please sign in again.', 'INVALID_SESSION')
+    }
     userId = session.user.id
     tenantIdForLog = session.user.tenantId || undefined
 
@@ -176,8 +182,17 @@ export async function POST(request: NextRequest) {
     if (validation.error) {
       return validation.error
     }
-    const { title, description, assigneeId, vehicleId, orderId, customerId, dueDate } =
-      validation.data
+    const {
+      title,
+      description,
+      assigneeId,
+      vehicleId,
+      orderId,
+      customerId,
+      dueDate,
+      businessCreatedAt,
+      businessUpdatedAt,
+    } = validation.data
 
     logger.debug('POST /api/tasks - Request body', {
       tenantId,
@@ -207,6 +222,8 @@ export async function POST(request: NextRequest) {
         orderId: orderId ?? null,
         customerId: customerId ?? null,
         dueDate: dueDate ? new Date(dueDate) : null,
+        businessCreatedAt: businessCreatedAt ? new Date(businessCreatedAt) : null,
+        businessUpdatedAt: businessUpdatedAt ? new Date(businessUpdatedAt) : null,
       },
       include: {
         creator: {
